@@ -2,7 +2,11 @@
 
 ## Phase 1: Foundation (Weeks 1-4)
 - Literature review (expand Related Work)
-- Set up simulation environment (Gazebo + AirSim or Isaac Sim)
+- Set up simulation environment: **NVIDIA Isaac Sim + Pegasus Simulator + MAVROS**
+  - Isaac Sim: photorealistic rendering + physics (RTX, ground-truth depth/pose for evaluation)
+  - Pegasus Simulator: multirotor dynamics + PX4 SITL integration inside Isaac Sim
+  - MAVROS: ROS 2 ↔ MAVLink bridge for sending pose/velocity setpoints (OFFBOARD mode) to PX4
+  - Build a few indoor object scenes (USD assets) with ground-truth meshes for Chamfer-distance evaluation
 - Implement baseline traditional grid/circular path photogrammetry
 - Choose evaluation metrics: reconstruction completeness, accuracy (Chamfer distance), image count, flight time
 
@@ -12,8 +16,8 @@
   - Candidate pose sampling
   - Information gain estimation
   - Optimization with constraints (drone dynamics, collision)
-- Integrate with drone simulator
-- Initial real-world tests with small drone (e.g., DJI Mini or custom)
+- Integrate planner with the simulator: publish NBV camera poses as PX4 setpoints via MAVROS (OFFBOARD); capture RGB frames from the Isaac Sim camera sensor
+- Initial real-world tests with small drone (e.g., DJI Mini or PX4-based custom build for MAVROS parity)
 
 ## Phase 3: Optimization & Efficiency (Weeks 13-18)
 - Refine planner with learning-based components (optional RL or imitation learning)
@@ -35,7 +39,8 @@
 ## Resources Needed
 - Drone hardware (monocular camera preferred)
 - Computing: GPU workstation for reconstruction
-- Software: COLMAP, PyTorch, ROS2
+- Software: NVIDIA Isaac Sim, Pegasus Simulator, PX4 SITL, MAVROS, ROS 2, COLMAP, PyTorch
+- GPU: RTX-class GPU required for Isaac Sim (RTX rendering) in addition to the reconstruction workstation
 
 ## Risks & Mitigations
 - Indoor flight regulations → Use simulation heavily first
