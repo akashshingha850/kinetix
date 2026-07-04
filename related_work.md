@@ -124,5 +124,3 @@ Kinetix uniquely bridges adaptive NBV, monocular drone imaging, indoor object-ce
 <a id="ref34"></a>[34] X. Liu, Y. Wang, C. Feng, B. Zhou, and S. Shen, "SOAR: Simultaneous exploration and photographing with heterogeneous UAVs for fast autonomous reconstruction," in *Proc. IEEE Int. Conf. Robot. Autom. (ICRA)*, 2024. arXiv: [2409.02738](https://arxiv.org/abs/2409.02738)
 
 ---
-
-*Citation note: In-text citations are clickable and link to the matching entry in the reference list; every reference carries a resolvable DOI or arXiv link for verification. All references were checked against IEEE Xplore, ACM DL, CVF Open Access, arXiv, Springer, and Semantic Scholar. Two author lists were corrected during verification: reference [22] (NeU-NBV — corrected to Jin, Chen, Rückin, Popović) and reference [31] (Schmid — corrected to Schmid, Reijgwart, Ott, Nieto, Siegwart, Cadena). Reference [5] (OpenSfM) has no formal peer-reviewed paper and is cited as a software repository per IEEE convention. Reference [34] (SOAR) author list should be re-confirmed against the final camera-ready version before submission.*
