@@ -28,6 +28,7 @@ Extras planned per phase (installed when the phase starts, not before):
 | K2 | `gsplat` (CUDA build against torch cu128) | 3DGS densifier + NVS metrics |
 | K2 | `colmap/colmap` Docker image (CUDA) | dense MVS (`colmap_mvs` densifier) |
 | K2 | `lpips` | NVS metric |
+| K3 | FoundationStereo (NVlabs repo + weights, research licence) | `stereo_learned` depth source. SGBM (OpenCV, installed) is the fallback |
 | K4 | `docker/Dockerfile` → `kinetix:jazzy` image | `rclpy` for T1 serve / T2 / T3 |
 
 ## Machine settings (`.env`, git-ignored)

@@ -30,10 +30,15 @@ uv run kinetix bench --matrix config/bench/smoke.yaml --check   # bench regressi
 | `planner.sampler` | all samples within standoff/altitude, pitch = mount pitch, yaw points at the ROI |
 | `planner.constraints` | boxes, standoff shell, segment-vs-box intersection on hand-made cases |
 | `planner.select` | λ = 0 → argmax gain. Big λ → nearest. Ties broken by seed. |
+| `planner.sampler` (Tammes) | 128 points, near-uniform minimum angular spacing. Reachability mask drops views below the floor or in no-fly boxes |
+| `scorers.fvs` | picks the view farthest from all captured views. Deterministic |
+| `offline.metrics` (N@q, AUC, Kendall) | N@q interpolation on a synthetic curve, and NaN when q·F_ref is never reached. AUC of a step curve. Kendall's τ = 1 for identical rankings and −1 for reversed |
 | `planner.scorers.*` | on synthetic `ReconState` fakes: a view of only well-triangulated points scores below a view of a gap. Random scorer is seed-deterministic. |
 | `offline.metrics` | identical clouds → 0 / F = 1. Sphere offset by d → Chamfer d. Empty recon → completeness = 0, no crash. |
 | architecture | import rule (architecture.md §4): `planner/` and `core/` import no `rclpy` / adapter / `offline` (AST scan) |
-| monocular rule | `rig/mavros.py` subscription list contains no forbidden topic (interfaces.md §4) |
+| topic whitelist | for each sensing preset, `rig/mavros.py`'s subscription list equals the whitelist (interfaces.md §4). `mono` has no right/depth topic. No mode has point_cloud/mapping/odom |
+| sensing config | preset → (plan_depth, recon_input) resolution. `uses_gt` is true when the depth source is `gt` |
+| `recon.depth.mono` | scale fit recovers a known scale from synthetic depth + sparse points |
 
 ## 2. Component tests (`tests/component/`, `t0`): real libraries, fixture data
 
@@ -42,6 +47,8 @@ Fixture `tests/fixtures/pool_tiny/`: 24 views of one scene, 320×240, with GT de
 is a deliberate act, recorded in the fixture's `pool.yaml`.
 
 - `ReconState`: adding 8 orbit frames registers ≥ 7. Aligned camera centres are within 2 % of the ROI diagonal of the pool poses.
+- Stereo-rig SfM on the same 8 frames (+ right images): metric scale within 1 % of GT **without** pose priors.
+- `stereo_learned` with the SGBM backend on fixture pairs: median error vs GT depth < 3 % in the ROI (FoundationStereo variant marked `gpu`).
 - Session loop with `PoolRig`, `orbit` and `random`, budget 8: the run dir passes the schema check, the run is deterministic per seed (same `chosen` sequence twice), and `stop_reason` is recorded.
 - `kinetix eval` on that run with `densify=none` (sparse points only) writes a valid `metrics.json`.
 - `depth_prior` (marker `gpu`): DA-V2 runs on one fixture image, and the scale fit to sparse points has a residual below a threshold.
@@ -55,6 +62,7 @@ is a deliberate act, recorded in the fixture's `pool.yaml`.
 **`t2` flight.** Preconditions: `SIM_SCENARIO=<kinetix scene> ./bisg all headless` is up, and `./bisg smoke` passes.
 - `MavrosRig.start()` arms, takes off and reaches the standby pose. `capture_at` on 3 poses: image
   received, pose error vs `state/pose` < 0.10 m / 3°, image stamp after settle, K equals `camera_info`.
+- Same with `sensing=stereo_full`: left/right/depth share one stamp, and the baseline equals 63 mm ± 1 mm.
 - `finish()` lands. The test always lands in a `finally`.
 - Margins allow for 0.3–0.5× real time (bisg migration-errors M8). All timeouts are in sim time.
 

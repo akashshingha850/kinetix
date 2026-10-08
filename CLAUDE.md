@@ -4,10 +4,12 @@ Adaptive NBV photogrammetry for indoor objects with a monocular drone. Read `doc
 then `docs/todo.md` for the current phase. Update `docs/todo.md` when work is finished.
 
 - Build phase by phase (`docs/roadmap.md`, K0–K6). Do not start a later phase or widen scope unless asked.
+- Paper claims are C1–C5 in `docs/publication-plan.md` (ADR-K08). Never call the image saving a novelty, and every "first" must survive a novelty sweep.
 - APIs, ROS topics and frames are defined in `docs/interfaces.md`. Change it there first, then the code.
 - The sim/flight platform is `~/bisg_isaac` (ADR-K01): use only its interface contract, never copy its code.
   A change bisg needs is made in bisg under its own CLAUDE.md rules.
-- Monocular rule (ADR-K03): only the left ZED image, `camera_info` and the vehicle pose.
+- Sensing modes (ADR-K07): `mono` is the method (left image + `camera_info` + vehicle pose). Stereo presets are
+  comparisons through the same loop. Topics come from the per-mode whitelist (interfaces.md §4). Never ZED point cloud/mapping/odom.
 - Dependency rule (architecture.md §4): `planner/` and `core/` never import `rclpy`, rig adapters or `offline/`.
 - Poses: `T_map_cam`, ENU map, OpenCV optical camera. Convert to COLMAP/OpenGL only in `core.geometry`.
 - Python env is `uv` (`uv run ...`). No host ROS. ROS code runs in the `kinetix` Docker image (K4).

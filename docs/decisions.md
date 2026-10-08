@@ -21,7 +21,7 @@ selects from pools (T0). Continuous-pose (T1) and flown (T2) runs are a transfer
 **Consequences.** Deterministic, CI-able, minutes per matrix. The view space is discretised, so pool
 density is a parameter and must be reported. Real dense captures become real pools with the same code.
 
-## ADR-K03 — Monocular rule (2026-10-08, accepted)
+## ADR-K03 — Monocular rule (2026-10-08, **superseded by ADR-K07**)
 
 **Decision.** Planning and reconstruction use only the left ZED image + `camera_info` + the vehicle
 pose. Right image, ZED depth, point cloud, disparity, mapping and ZED odometry topics are forbidden
@@ -50,3 +50,30 @@ keeps versions identical.
 
 **Decision.** The rig settles before every capture (no motion blur, exact poses, simple timing).
 Capture on the move is a K5 optimisation with its own benchmark row (flight-time metric).
+
+## ADR-K07 — Sensing mode is an experiment axis: monocular method, stereo comparison (2026-10-08, accepted)
+
+**Context.** The drone carries a ZED Mini (stereo). A monocular-only design leaves "why not use the
+stereo?" unanswered, and ActMVS (2026) narrows the monocular novelty claim. Study:
+[research/mono-vs-stereo.md](research/mono-vs-stereo.md).
+**Decision.** Two independent config axes, `sensing.plan_depth` (none | mono | stereo | gt) and
+`sensing.recon_input` (left | stereo_rig | stereo_rig+depth), with named presets. `mono` stays the
+Kinetix method. Stereo presets are comparisons that run through the same loop, offline pipeline and
+metrics. The rig's topic whitelist is derived from the mode. ZED point cloud, mapping and odometry
+are never Kinetix inputs. Pools always store left + right + GT depth.
+**Consequences.** Pools are about 2× larger. One more dependency at K3 (FoundationStereo; SGBM fallback).
+A depth study is needed to justify learned stereo as a stand-in for the ZED SDK on T0. The paper's claim
+becomes a measured mono-vs-stereo trade-off instead of an assumption.
+
+## ADR-K08 — Position Kinetix as a measurement paper; strengthen baselines and protocol compatibility (2026-10-08, accepted)
+
+**Context.** The novelty search ([research/reports/Kinetix novelty search.md](research/reports/Kinetix%20novelty%20search.md))
+found the image-saving headline, "first monocular active reconstruction" and "foundation depth in NBV" already
+claimed. A combination and three experimental contributions remain open.
+**Decision.** The paper's claims are C1–C5 ([publication-plan.md](publication-plan.md)). The image saving is a
+reported result against the strongest baselines. The baseline set grows to fixed patterns + `fvs` + `volumetric_ig`
++ `fisherrf` + `ma_scvp`. Pools add an ObjView-Bench-compatible `tammes:128` layout with reachability masks. Metrics add
+N@q at q ∈ {0.9, 0.95} with reference-density sensitivity, coverage AUC, K = 5/30 budgets and Kendall's τ across tiers.
+C1 must win a decisive anchoring ablation (go/no-go at G2).
+**Consequences.** More baseline integration work in K2–K3 (two external code bases). The object set must include
+community-pool objects and is constrained by licences. Real flights must be quantitative.

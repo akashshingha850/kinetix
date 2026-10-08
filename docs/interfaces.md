@@ -42,6 +42,9 @@ class Frame:
     gt_pose: Pose | None           # sim only; never read by planner/recon (except pose_source=gt)
     travel_m: float                # path length flown since the previous frame
     pool_id: str | None = None     # T0: id of the pool view
+    right_image: Path | None = None  # only when the sensing mode needs it (stereo_rig*, stereo depth on T0/T1)
+    depth: Path | None = None        # float32 m, left optical frame; set by the DepthSource, not the rig
+    depth_source: str | None = None  # mono | stereo_learned | stereo_zed | gt
 
 @dataclass(frozen=True)
 class Candidate:
@@ -66,7 +69,8 @@ Selected by name from config through a registry (`config.py`: `@register("scorer
 ```python
 class Rig(Protocol):
     caps: RigCaps                  # continuous: bool, has_gt: bool, pool: list[Candidate] | None,
-                                   # mount_pitch_rad: float, speed_mps: float
+                                   # mount_pitch_rad: float, speed_mps: float,
+                                   # stereo: bool, baseline_m: float | None, sensor_depth: bool (ZED SDK topic)
     def start(self) -> None: ...
     def pose(self) -> Pose: ...
     def capture_at(self, target: Pose) -> Frame: ...      # move, settle, grab; raises RigError
@@ -81,6 +85,12 @@ class Constraint(Protocol):
 class Scorer(Protocol):
     uses_gt: bool                  # True → result is an oracle/upper bound, flagged in run.yaml
     def score(self, cands: list[Candidate], recon: "ReconState") -> np.ndarray: ...  # float, ≥ 0
+
+class DepthSource(Protocol):     # selected by sensing.plan_depth (+ tier); architecture.md §2a
+    name: str                      # mono | mono_metric_noanchor | mono_stereo_anchor | stereo_learned | stereo_zed | gt
+    uses_gt: bool
+    def depth(self, frame: Frame, recon: "ReconState") -> tuple[np.ndarray, np.ndarray]: ...
+                                   # (H, W) metres, (H, W) confidence 0..1; NaN = no depth
 
 class Stop(Protocol):
     def done(self, recon: "ReconState", budget: "Budget") -> bool: ...
@@ -115,15 +125,23 @@ for drone `n` (default 1), namespace `/drone_<n>`:
 |---|---|---|---|
 | sub | `mavros/state` | `mavros_msgs/State` | connected / armed / mode |
 | sub | `mavros/local_position/pose` | `geometry_msgs/PoseStamped` | vehicle pose in `map` → `Frame.pose` (∘ mount) |
-| sub | `zed/zed_node/left/color/rect/image` | `sensor_msgs/Image` | **the only image Kinetix reads** |
+| sub | `zed/zed_node/left/color/rect/image` | `sensor_msgs/Image` | `Frame.image` (every mode) |
 | sub | `zed/zed_node/left/color/rect/camera_info` | `sensor_msgs/CameraInfo` | `Frame.K` (never hard-code K) |
+| sub (stereo_rig*) | `zed/zed_node/right/color/rect/image` + `right/.../camera_info` | `Image`, `CameraInfo` | `Frame.right_image`, baseline `-P[0,3]/P[0,0]` |
+| sub (plan_depth=stereo) | `zed/zed_node/depth/depth_registered` | `Image` 32FC1 m | `stereo_zed` depth source |
 | sub | `tf_static` | | `T_base_cam` (base_link → zed_left_camera_optical_frame) |
 | sub (sim, eval only) | `state/pose` | `geometry_msgs/PoseStamped` | Pegasus ground truth → `Frame.gt_pose` |
 | pub | `mavros/setpoint_position/local` | `geometry_msgs/PoseStamped` | 20 Hz while OFFBOARD |
 | srv | `mavros/cmd/arming`, `mavros/set_mode` | | arm, OFFBOARD |
 
-**Forbidden** (monocular rule, ADR-K03, checked by a test): `right/*`, `depth/*`, `point_cloud/*`,
-`disparity/*`, `mapping/*`, `zed_node/odom`.
+**Topic whitelist per sensing mode** (ADR-K07, checked by a unit test): the rig subscribes to the
+rows marked "every mode", plus the stereo rows only when `sensing.recon_input` / `sensing.plan_depth`
+asks for them. So in `mono` the right image and depth are not subscribed at all. Never subscribed in any
+mode: `point_cloud/*`, `disparity/*`, `mapping/*`, `zed_node/odom`. The `zed_mapping` baseline is a
+separate script that records `mapping/fused_cloud`, not a `MavrosRig` mode.
+
+Image pairing: in stereo modes left, right and depth must have the **same stamp** (the wrapper
+publishes them from one grab). The rig waits for a matching triple after settle.
 
 `capture_at` sequence: stream the setpoint → wait until the position error is below `tol_pos` (0.10 m),
 yaw error below `tol_yaw` (3°) and speed below 0.05 m/s for `settle_s` (1.0 s) → take the **first image
@@ -140,8 +158,8 @@ run per drone. When bisg ships a `vehicle/cmd` goto, `MavrosRig` switches to it 
 Runs inside `bisg/sim:6.0.0` with a Kinetix scene USD. No drone, no PX4: a free camera with the
 ZED Mini intrinsics from `pool.yaml` / config.
 
-- **batch mode** (`--views views.jsonl --out <pool_dir>`): renders RGB + GT depth (+ optional
-  instance mask) for every pose, then writes a pool ([data-format.md](data-format.md) §2). This is
+- **batch mode** (`--views views.jsonl --out <pool_dir>`): renders left RGB, **right RGB** (left pose ∘
+  `[baseline, 0, 0]` in the optical frame) and GT depth (+ optional instance mask) for every pose, then writes a pool ([data-format.md](data-format.md) §2). This is
   the first deliverable (K1).
 - **serve mode** (K4): request/response over ROS 2 under `/kinetix/render/`:
   - `goal` `geometry_msgs/PoseStamped` (frame `map`, `T_map_cam`, header.stamp = request id)
@@ -153,8 +171,9 @@ ZED Mini intrinsics from `pool.yaml` / config.
 
 ```
 kinetix check                                    # = scripts/check_env.py
-kinetix pool make  --scene S --layout rings:4x60 [--test-split 0.1]   # views.jsonl → T1 batch render
-kinetix run   --scene S --method M --rig pool|isaac|mavros --seed K [key=value ...]  → runs/<id>/
+kinetix pool make  --scene S --layout rings:4x60|tammes:128 [--test-split 0.1]   # views.jsonl → T1 batch render
+kinetix run   --scene S --method M --sensing mono|stereo_plan|... --rig pool|isaac|mavros --seed K [key=value ...]  → runs/<id>/
+kinetix depth-study --scene S --sources stereo_learned,mono,gt [--zed]  → docs/research/depth-study.md data
 kinetix eval  runs/<id> [--densify gsplat|colmap_mvs]                  → runs/<id>/metrics.json
 kinetix bench --matrix config/bench/<name>.yaml [--jobs N]             → bench/<name>/report.md
 ```

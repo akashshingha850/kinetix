@@ -7,9 +7,11 @@ Related docs: [interfaces.md](interfaces.md) (APIs, ROS topics, frames), [data-f
 
 ## 1. What Kinetix is
 
-A closed loop that captures **few, well-chosen monocular images** of one indoor object with a
-drone, then reconstructs the object with a standard photogrammetry pipeline (COLMAP-format SfM, then
-MVS or 3D Gaussian Splatting).
+A closed loop that captures **few, well-chosen images** of one indoor object with a drone, then
+reconstructs the object with a standard photogrammetry pipeline (COLMAP-format SfM, then MVS or 3D
+Gaussian Splatting). The primary method is **monocular**. Because the drone carries a ZED Mini, the
+same loop also runs with **stereo** inputs as a measured comparison (§2a,
+[research/mono-vs-stereo.md](research/mono-vs-stereo.md)).
 
 ```
  seed views ──► capture ──► update online SfM ──► score candidate views ──► pick next view ──┐
@@ -18,13 +20,13 @@ MVS or 3D Gaussian Splatting).
  stop (budget / no gain) ──► offline: full SfM ──► densify ──► evaluate vs ground truth
 ```
 
-Design goals, in priority order:
+Design goals, in priority order (the paper contributions they serve are in [publication-plan.md](publication-plan.md)):
 
 1. **One planner, four execution tiers.** The planning code is identical from an offline replay to
    the real drone; only the *rig adapter* changes (§3).
 2. **Minimal.** Pure Python on top of pycolmap, Open3D and PyTorch. No ROS in the planner and no
    custom C++. One Docker image, used only where ROS is needed.
-3. **Modular.** Every research choice (scorer, sampler, pose source, densifier) is one file behind a
+3. **Modular.** Every research choice (scorer, sampler, pose source, depth source, densifier) is one file behind a
    small protocol, selected by name from config. Each baseline is a configuration of the same loop.
 4. **Measurable.** Every run writes one self-describing run directory, so evaluation and
    benchmarks are pure functions of it ([data-format.md](data-format.md)).
@@ -51,10 +53,29 @@ look identical to Kinetix (ADR-K01).
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Monocular rule (ADR-K03).** For planning and reconstruction Kinetix reads only the **left ZED image +
-its `camera_info`** and the **vehicle pose**. It never reads the right image, ZED depth, point cloud
-or ZED mapping. The vehicle's own state estimate (PX4 EKF2, fed by ZED VIO on hardware) is used to
-fly and as a metric pose prior. That is the drone's navigation, not a reconstruction input.
+## 2a. Sensing modes: monocular method, stereo comparison (ADR-K07, supersedes ADR-K03)
+
+The hardware is stereo, and "monocular" is a property of the method. Two **independent** config axes
+decide which camera data planning and reconstruction may use:
+
+| Axis | Key | Values |
+|---|---|---|
+| depth for **planning** | `sensing.plan_depth` | `none` · `mono` (Depth Anything V2, scale-anchored to SfM, the C1 method) · `mono_metric_noanchor` · `mono_stereo_anchor` (ablations of the anchoring) · `stereo` · `gt` (oracle) |
+| input to **reconstruction** | `sensing.recon_input` | `left` · `stereo_rig` (L+R as a pycolmap rig) · `stereo_rig+depth` (+ stereo-depth TSDF) |
+
+Presets: `mono` (= Kinetix: mono / left), `mono_noprior` (none / left), `stereo_plan` (stereo / left),
+`stereo_full` (stereo / stereo_rig+depth), `oracle_depth` (gt / left). Keeping the axes separate lets
+the benchmark tell *planning* value apart from *reconstruction* value (hypothesis H1 in the study).
+
+Where `stereo` depth comes from, per tier: T2/T3 use the ZED SDK `depth/depth_registered` topic (NEURAL). T0/T1
+use FoundationStereo (fallback: OpenCV SGBM) on the rendered left/right pair, because the ZED SDK cannot
+run on stored images. The depth study (study §6) measures how far the two differ.
+
+The topics a rig may subscribe to are **derived from the sensing mode** (whitelist in
+[interfaces.md](interfaces.md) §4, checked by a test). In `mono` that is only the left image, its
+`camera_info` and the vehicle pose. In every mode Kinetix never reads ZED odometry, point cloud or mapping.
+Navigation is always the drone's own (PX4 EKF2, fed by stereo ZED VIO on hardware). It is used to fly
+and, per `recon.pose_source`, as a metric prior.
 
 ## 3. Execution tiers
 
@@ -64,11 +85,12 @@ Same loop, same config, a different `rig:`. Each tier is a superset of the reali
 |---|---|---|---|---|---|---|
 | **T0** replay | `PoolRig` | pre-rendered **view pool** (discrete candidates) | exact pool poses (+ optional noise) | mesh + GT depth | seconds | algorithm dev, unit/component tests, most benchmark runs |
 | **T1** render | `IsaacRenderRig` | Isaac renders a camera teleported to any pose | exact (+ optional noise) | mesh + GT depth | ~1 s/view | continuous candidate spaces, photoreal checks, **generates T0 pools** |
-| **T2** sim flight | `MavrosRig` | ZED SDK twin left image in the bisg sim | EKF2 `local_position` | Pegasus `state/pose` + mesh | real time × 0.3–0.5 | dynamics, settle time, flight-time metrics, pose noise |
-| **T3** real | `MavrosRig` | real ZED Mini left image | EKF2 (ZED VIO) | external scan of the object (if any) | real time | validation |
+| **T2** sim flight | `MavrosRig` | ZED SDK twin left (+ right, SDK depth in stereo modes) in the bisg sim | EKF2 `local_position` | Pegasus `state/pose` + mesh | real time × 0.3–0.5 | dynamics, settle time, flight-time metrics, pose noise |
+| **T3** real | `MavrosRig` | real ZED Mini left (+ right, SDK depth) | EKF2 (ZED VIO) | external scan of the object (if any) | real time | validation |
 
 T0 is the workhorse: a **view pool** is a dense set of pre-rendered views around an object (e.g. 600
-views on 4-DoF reachable poses + a held-out test split). The planner may only pick pool views, so
+views on 4-DoF reachable poses + a held-out test split). Each view stores the left **and right** image
+and GT depth, so one pool serves every sensing mode. The planner may only pick pool views, so
 the next-best-view problem becomes a discrete selection. That is deterministic, cheap and standard in
 the NBV literature. T1 (batch mode) produces pools. T0 also works for real data: a dense real capture
 becomes a real pool.
@@ -89,15 +111,18 @@ src/kinetix/
                mavros.py      T2/T3 (ROS 2, bisg contract)
   recon/       state.py       ReconState: online SfM over pycolmap (+ metric alignment)
                align.py       Sim3 / Umeyama, ATE
-               depth_prior.py monocular depth (Depth Anything V2), scale-fit to sparse points
+               depth/         DepthSource per frame: mono.py (DA-V2 anchored to SfM; `anchor: sfm | stereo | none`, `model: da_v2 | metric3d | depth_pro`)
+                              stereo_learned.py (FoundationStereo | SGBM, T0/T1) · stereo_zed.py (T2/T3 topic) · gt.py
   planner/     loop.py        the session loop (§5) — the only orchestrator
                seed.py        initial views (e.g. 4-6 views on a ring around the ROI)
-               sampler.py     candidate poses (pool lookup | view sphere | ring stack)
+               sampler.py     candidate poses (pool lookup | view sphere | ring stack | Tammes sphere)
                constraints.py workspace box, no-fly boxes, standoff, altitude, straight-line path check
                select.py      argmax of gain − λ·travel cost
                stop.py        budget / time / gain plateau
                sequence.py    fixed-sequence planners: orbit, grid (baselines)
-               scorers/       random · coverage_oracle · sfm_uncertainty · depth_frontier · combo
+               scorers/       random · fvs · volumetric_ig · coverage_oracle · sfm_uncertainty · depth_frontier · combo
+               external/      wrappers for third-party pool baselines: fisherrf.py, ma_scvp.py (their code runs in
+                              its own env/container; the wrapper only exchanges candidate ids and scores)
   offline/     sfm.py         final SfM over all captured frames (pycolmap)
                densify.py     backends: colmap_mvs (CUDA COLMAP container) | gsplat (+ TSDF mesh)
                metrics.py     accuracy, completeness, Chamfer, F-score, ATE, PSNR/SSIM
@@ -168,6 +193,8 @@ and the observed-surface bounding box.
   constraints and the planner all work in the metric `map` frame.
 - **Pose source** (`recon.pose_source`, an ablation axis): `sfm` (pure SfM, aligned after),
   `prior` (rig poses as priors / known-pose triangulation), `gt` (oracle, sim only).
+- **Stereo rig** (`sensing.recon_input: stereo_rig*`): the right image is added as a second camera of a
+  pycolmap `Rig` with the baseline from `camera_info`. SfM is then metric without any pose prior.
 
 ## 7. Next-best-view scoring
 
@@ -177,10 +204,13 @@ Every scorer has the same signature, `score(cands, recon) -> gains`. The researc
 | Scorer | Signal | Needs | Role |
 |---|---|---|---|
 | `random` | — | — | baseline |
+| `fvs` | distance to the farthest already-captured view (farthest-view sampling) | poses only | strong simple baseline |
+| `volumetric_ig` | entropy of unobserved / rear-side voxels in the TSDF visible from the candidate (Isler/Delmerico family) | a depth source | classical NBV baseline |
+| `fisherrf`, `ma_scvp` (external) | 3DGS Fisher information; learned one-shot + NBV view planning | their own code | radiance-field and learned baselines |
 | `coverage_oracle` | unseen GT-surface area visible from the candidate (Open3D raycast on the GT mesh) | GT mesh | upper bound, sim only |
 | `sfm_uncertainty` | sparse points visible in the candidate, weighted by poor triangulation angle, short track or high reprojection error; plus angular gaps in the view distribution around the ROI | sparse model | core monocular signal |
-| `depth_frontier` | Depth Anything V2 depth per frame, scale-fit to sparse points, fused into a coarse TSDF in the ROI; gain = unknown/frontier voxels visible from the candidate | GPU, sparse model | completeness signal without a depth sensor |
-| `combo` | weighted sum of the above (weights in config) | | Kinetix method |
+| `depth_frontier` | per-frame depth from the configured `DepthSource` (`sensing.plan_depth`: mono / stereo / gt), fused into a coarse TSDF in the ROI; gain = unknown/frontier voxels visible from the candidate | a depth source | completeness signal. The same scorer serves mono and stereo, so the comparison changes only the depth |
+| `combo` | weighted sum of `sfm_uncertainty` and `depth_frontier` (weights in config) | | Kinetix method (C1) |
 
 `select` maximises `gain − λ · travel_cost(current → candidate)`, where travel cost is the
 straight-line distance, plus a yaw-change term. Candidates are generated **inside the camera's
@@ -204,10 +234,12 @@ reachable pose space** (§8), so the planner never proposes a view the drone can
 To keep the comparison fair, the online model is only for planning. Every method's final model is
 rebuilt the same way from its captured frames alone:
 
-1. `offline/sfm.py`: pycolmap SfM over all frames (`sfm` or `prior` poses, per config).
+1. `offline/sfm.py`: pycolmap SfM over all frames (`sfm` or `prior` poses; rig SfM when
+   `recon_input` is stereo).
 2. Sim3-align to GT camera centres (sim) or to the rig poses (real).
 3. `offline/densify.py`: `colmap_mvs` (CUDA COLMAP in Docker: the pip pycolmap wheel is CPU-only)
-   or `gsplat` (3DGS, then TSDF-fused rendered depth → mesh).
+   or `gsplat` (3DGS, then TSDF-fused rendered depth → mesh), or `tsdf_depth` (stereo modes only:
+   TSDF fusion of the stored stereo depth at SfM poses).
 4. `offline/evaluate.py`: crop to the ROI, compare with the **observable** GT surface, write
    `metrics.json` ([benchmark.md](benchmark.md) §3).
 
@@ -244,4 +276,5 @@ GPU budget on workstation B (2× RTX 6000 Ada): Isaac on GPU 0, depth prior / gs
 | Q2 | Object set: which USD assets (SimReady / YCB / Objaverse-converted) with clean GT meshes? 3 for K1–K3, 8–10 for the paper. | K1 |
 | Q3 | bisg integration: a read-only mount of `$KINETIX_DATA/scenes` into the sim container so `world.usd_path` can point to a Kinetix scene (small bisg compose change, done in bisg with its own docs). | K1 (pool generation) |
 | Q4 | Ground truth for real objects (T3): handheld scanner / reference photogrammetry with 300+ images? | K6 |
-| Q5 | Is the drone pose (EKF2 + ZED VIO) allowed as a prior in the paper's "monocular" claim? Default: yes, reported as an ablation (`pose_source: sfm` vs `prior`). | paper |
+| Q5 | Is the drone pose (EKF2 + ZED VIO) allowed as a prior in the paper's "monocular" claim? Default: yes, reported as an ablation (`pose_source: sfm` vs `prior`). Navigation is stereo in every mode. | paper |
+| Q6 | Stereo depth on T0 pools: FoundationStereo is the plan. Confirm after the depth study that its error vs the ZED SDK (sim) is small enough, or fit a ZED noise model `σ(z)` on GT depth instead. | K3 |
