@@ -76,7 +76,7 @@ registered fraction < 50 %, the run is marked `eval_valid: false` and kept out o
 | mono depth model | DA-V2 small · base · large (scale-fit) |
 | **depth anchoring (C1, decisive)** | `mono` (DA-V2 anchored to SfM) · `mono_metric_noanchor` (Metric3D v2 / Depth Pro used directly, FrontierNet-style) · `mono_stereo_anchor` (DA-V2 scale-fit to ZED depth, Next Best Sense-style) · `none`. If SfM anchoring does not beat both alternatives, C1 is engineering, not a contribution |
 | next-gen depth (optional) | Depth Anything 3 or VGGT multi-view depth with drone-pose scale |
-| stereo depth source (T0) | FoundationStereo · SGBM · GT + fitted ZED noise `σ(z)` (RQ5, Q6) |
+| stereo depth source (T0) | ZED SDK via the twin (pool `zed/`, default, ADR-K10) · FoundationStereo · SGBM · GT + fitted ZED noise `σ(z)` (RQ5, Q6) |
 | pose noise (T0) | 0 · 2 cm/1° · 5 cm/2° (emulates EKF2 error) |
 
 ## 5. Reporting rules

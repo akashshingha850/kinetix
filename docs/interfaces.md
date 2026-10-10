@@ -118,6 +118,8 @@ session and continues. `aborted` (RC loss, operator) ends the session cleanly.
 
 ## 4. ROS 2 interface (T2/T3: `rig/mavros.py`)
 
+> Proposed replacement for §4 and §5: [ros-pipeline.md](ros-pipeline.md) (ADR-K09). Until it is accepted, this section is the contract.
+
 A strict subset of the bisg vehicle interface contract (`bisg_isaac/docs/interface-contract.md`),
 for drone `n` (default 1), namespace `/drone_<n>`:
 
@@ -161,6 +163,10 @@ ZED Mini intrinsics from `pool.yaml` / config.
 - **batch mode** (`--views views.jsonl --out <pool_dir>`): renders left RGB, **right RGB** (left pose ∘
   `[baseline, 0, 0]` in the optical frame) and GT depth (+ optional instance mask) for every pose, then writes a pool ([data-format.md](data-format.md) §2). This is
   the first deliverable (K1).
+  With `--zed-depth` (ADR-K10) the camera is bisg's kinematic ZED_M twin streamed to the real `zed_wrapper`, as in bisg's
+  `sim/tools/zed_pool_probe.py`. Per view it also stores the SDK `depth/depth_registered` + `confidence/confidence_map`, taking the
+  first pair stamped ≥ **0.6 s** after the teleport (measured worst settle 0.54 s, 2 stale frames). It reads every Isaac annotator only after
+  ≥ 3 rendered frames, because the ground truth itself lagged at frame 2. One wrapper per sim run (bisg B18), so a pool is one session.
 - **serve mode** (K4): request/response over ROS 2 under `/kinetix/render/`:
   - `goal` `geometry_msgs/PoseStamped` (frame `map`, `T_map_cam`, header.stamp = request id)
   - `image` `sensor_msgs/Image`, `camera_info`, `depth` (`32FC1`, m): reply stamped with the request id

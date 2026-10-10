@@ -77,3 +77,29 @@ N@q at q ∈ {0.9, 0.95} with reference-density sensitivity, coverage AUC, K = 5
 C1 must win a decisive anchoring ablation (go/no-go at G2).
 **Consequences.** More baseline integration work in K2–K3 (two external code bases). The object set must include
 community-pool objects and is constrained by licences. Real flights must be quantitative.
+
+## ADR-K09 — ROS 2 pipeline: ROS at the edges, one goto action + one snapshot service (2026-10-10, proposed)
+
+**Context.** T1/T2/T3 need ROS. The current design uses two rig adapters (`IsaacRenderRig` and `MavrosRig`) that speak different
+protocols. The design has a T1 request/response emulated over topics, and `MavrosRig` subscribes to 30 Hz HD1080 image streams (≈ 250 MB/s each on
+CycloneDDS loopback) to keep one frame per view.
+**Decision.** [ros-pipeline.md](ros-pipeline.md). Planner/recon stay pure Python in one `session` node. The rig side is two
+generic nodes, `goto` (action `kinetix_msgs/Goto`, the only setpoint producer) and `snapshot` (service `kinetix_msgs/Snapshot`,
+lazy sensor subscription, stream whitelist from the sensing mode). The T1 render server serves the same two interfaces, so one
+client, `RosRig`, covers T1–T3. Kinetix itself publishes only `kinetix/status`, `kinetix/viz` and `kinetix/recon/points`, all transient-local and the last two only while subscribed.
+**Consequences.** Steady-state traffic ≈ 50 KB/s plus one lossless frame set per view. A `kinetix_msgs` package is built in the kinetix image.
+`goto` / `snapshot` carry no Kinetix types, so bisg can adopt them (`goto` = the contract's `offboard_controller`).
+interfaces.md §4/§5 change on acceptance. The latency and QoS assumptions are measured at K4 (ros-pipeline.md §8).
+
+## ADR-K10 — Pools carry real ZED SDK depth, rendered through the twin (2026-10-10, proposed)
+
+**Context.** ADR-K07 planned FoundationStereo (SGBM fallback) as the stereo depth of T0/T1 pools because the ZED SDK cannot read
+stored images, which left Q6 (is learned stereo a fair stand-in for the SDK?) open. bisg's pool-depth probe (2026-10-10,
+bisg `docs/zed-sdk-sim.md`) streamed teleported views of the ZED_M twin into the real SDK. Depth settled ≤ 0.54 s after a teleport, with median error
+0.35 % (0.3–2 m) / 0.65 % (2–5 m) and revisits within 0.5–0.8 %, at ~0.7 s per view.
+**Decision.** `render_server.py --zed-depth` stores the SDK's `depth_registered` + `confidence_map` per view (`zed/`, `zed_conf/`), taken
+≥ 0.6 s after the teleport. `stereo_zed` reads them on T0/T1, so T0 and T2 share one depth source. FoundationStereo/SGBM stay as the fallback
+(pools without the twin, real dense captures without an SVO) and as an ablation row.
+**Consequences.** One pool = one sim session with one wrapper (bisg B18). Pool rendering takes ~0.7 s per view (≈ 7 min / 600 views). Pools grow
+by two float32 maps per view. Sim stereo has no sensor noise, so sim SDK depth is an upper bound; the real half of the depth study uses
+SVO recordings (`./bisg zed record`). Q6 is closed if this is accepted.

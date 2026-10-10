@@ -24,6 +24,7 @@ uv run python scripts/check_env.py
 | know what we publish, where and when | [docs/publication-plan.md](docs/publication-plan.md) |
 | see how the system is built | [docs/architecture.md](docs/architecture.md) |
 | write code against an API, topic or frame | [docs/interfaces.md](docs/interfaces.md) |
+| see the ROS 2 node graph, topic budget and QoS (proposed) | [docs/ros-pipeline.md](docs/ros-pipeline.md) |
 | read or write scenes, pools, runs | [docs/data-format.md](docs/data-format.md) |
 | know what to build next and when it is done | [docs/roadmap.md](docs/roadmap.md), [docs/todo.md](docs/todo.md) |
 | write or run tests | [docs/testing.md](docs/testing.md) |

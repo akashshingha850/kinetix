@@ -45,6 +45,8 @@ images/<id>.png    left RGB, 8-bit
 right/<id>.png     right RGB, 8-bit (stereo modes)
 depth/<id>.npy     float32 metres, GT (eval / oracle / gt depth source only)
 stereo/<id>.npy    float32 metres, learned-stereo depth cache (written on first use, keyed by model in pool.yaml)
+zed/<id>.npy       float32 metres, real ZED SDK depth of the view (`--zed-depth`, ADR-K10); NaN = no depth
+zed_conf/<id>.npy  float32 0–100 SDK confidence (higher = less confident; > depth_confidence already NaN in zed/)
 ```
 
 ```yaml
@@ -54,6 +56,7 @@ generator: {tool: render_server, git: <sha>, layout: "rings:4x60", seed: 0}   # 
 camera: {width: 1280, height: 720, fx: 529.8, fy: 529.8, cx: 640, cy: 360, mount_pitch_deg: 0, baseline_m: 0.063}
 stereo_cache: {model: foundation_stereo, version: "<tag>"}   # absent until first computed
 renderer: {isaac: 6.0.0, mode: RaytracedLighting, settle_frames: 3}
+zed_depth: {sdk: 5.4.1, depth_mode: NEURAL_PLUS, settle_s: 0.6, bisg: <sha>}   # absent when rendered without --zed-depth
 n_views: 240
 splits: {candidate: 216, test: 24}
 ```

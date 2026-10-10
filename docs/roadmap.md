@@ -35,7 +35,7 @@ Deliverables
 - Object set decided (Q2) with licences checked: SimReady plus ≥ 3 from Objaverse++ / GSO / OmniObject3D.
 - `sim/scenes/`: build **one** scene (Q2: a textured, mid-complexity object in a simple room) →
   `scene.usd`, `gt_mesh.ply`, `scene.yaml`. bisg mount for the scene (Q3).
-- `sim/render_server.py` **batch mode** + `kinetix pool make` → first pools: `rings:4x60` (~240 views, 10 % test)
+- `sim/render_server.py` **batch mode** (with `--zed-depth`: SDK depth + confidence per view, ADR-K10) + `kinetix pool make` → first pools: `rings:4x60` (~240 views, 10 % test)
   and `tammes:128` with reachability masks (ObjView-Bench-compatible),
   rendering left + right + GT depth per view (one pool serves mono and stereo, ADR-K07).
 - `core.types.Frame` carries the optional stereo fields from the start (interfaces.md §2), even though K1 runs `mono` only.

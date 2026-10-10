@@ -6,9 +6,13 @@ Current phase: **K0 → K1**. Phase definitions and exit tests: [roadmap.md](roa
 - [x] K0 doc set (architecture, interfaces, data-format, roadmap, testing, benchmark, decisions, setup) — 2026-10-08
 - [x] K0 Python env (`pyproject.toml`, `uv.lock`), `scripts/check_env.py` passes on workstation B — 2026-10-08
 - [x] Mono-vs-stereo study (`docs/research/mono-vs-stereo.md`). Plan updated: ADR-K07 sensing axes, stereo in pools/interfaces/benchmark/roadmap — 2026-10-08
+- [x] Q6 tested in bisg 2026-10-10: real ZED SDK depth on teleported twin views works (settle ≤ 0.54 s, 0.35–0.65 % error < 5 m). Docs: ADR-K10 (proposed), architecture §2a/Q6, interfaces §5 `--zed-depth`, data-format `zed/`, `zed_conf/`, ros-pipeline §10. bisg now advertises `confidence/confidence_map` and has `./bisg zed record` (SVO)
+- [x] ROS 2 topic analysis + pipeline proposal (`docs/ros-pipeline.md`, ADR-K09 proposed) — 2026-10-10
 - [x] Novelty search (`docs/research/reports/Kinetix novelty search.md`) and plan updated: contributions C1–C5, baselines fvs/volumetric_ig/fisherrf/ma_scvp, Tammes pool, N@q metrics, anchoring ablation, `docs/publication-plan.md` (ADR-K08) — 2026-10-08
 
 ## Next (K1)
+- [ ] Review ADR-K10 (pools with SDK depth via the twin); if accepted, `render_server.py --zed-depth` builds on bisg's `sim/tools/zed_pool_probe.py` pattern (Kinetix code, not a copy)
+- [ ] Review the ROS 2 pipeline proposal (`docs/ros-pipeline.md`, ADR-K09). On acceptance, move its §3/§4 tables into interfaces.md §4/§5
 - [ ] Review the doc set; answer Q1 (mount pitch), Q2 (object set), Q6 (T0 stereo source): architecture.md §12
 - [ ] Review the contribution wording C1–C5 (`publication-plan.md` §2) and the venue plan (§5)
 - [x] References cross-checked (Crossref + arXiv), DOI links on all 49 entries; fixed [3] [11] [20] [21] [27] [34] [45] — 2026-10-08

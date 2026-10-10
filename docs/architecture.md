@@ -67,9 +67,11 @@ Presets: `mono` (= Kinetix: mono / left), `mono_noprior` (none / left), `stereo_
 `stereo_full` (stereo / stereo_rig+depth), `oracle_depth` (gt / left). Keeping the axes separate lets
 the benchmark tell *planning* value apart from *reconstruction* value (hypothesis H1 in the study).
 
-Where `stereo` depth comes from, per tier: T2/T3 use the ZED SDK `depth/depth_registered` topic (NEURAL). T0/T1
-use FoundationStereo (fallback: OpenCV SGBM) on the rendered left/right pair, because the ZED SDK cannot
-run on stored images. The depth study (study §6) measures how far the two differ.
+Where `stereo` depth comes from, per tier: T2/T3 use the ZED SDK `depth/depth_registered` topic (NEURAL), with its
+`confidence/confidence_map`. T1 pools can carry the **same SDK depth**. The bisg probe of 2026-10-10 streamed teleported views of
+the ZED twin into the real SDK: settled in ≤ 0.54 s, median error 0.35 % at 0.3–2 m and 0.65 % at 2–5 m (bisg
+`docs/zed-sdk-sim.md`, ADR-K10). The SDK cannot read stored PNG pairs, so pools rendered without it, and real dense captures
+without an SVO, fall back to FoundationStereo (fallback: OpenCV SGBM). The depth study (study §6) measures how far those differ.
 
 The topics a rig may subscribe to are **derived from the sensing mode** (whitelist in
 [interfaces.md](interfaces.md) §4, checked by a test). In `mono` that is only the left image, its
@@ -112,7 +114,7 @@ src/kinetix/
   recon/       state.py       ReconState: online SfM over pycolmap (+ metric alignment)
                align.py       Sim3 / Umeyama, ATE
                depth/         DepthSource per frame: mono.py (DA-V2 anchored to SfM; `anchor: sfm | stereo | none`, `model: da_v2 | metric3d | depth_pro`)
-                              stereo_learned.py (FoundationStereo | SGBM, T0/T1) · stereo_zed.py (T2/T3 topic) · gt.py
+                              stereo_learned.py (FoundationStereo | SGBM) · stereo_zed.py (T2/T3 topic, or the pool's `zed/` depth on T0/T1) · gt.py
   planner/     loop.py        the session loop (§5) — the only orchestrator
                seed.py        initial views (e.g. 4-6 views on a ring around the ROI)
                sampler.py     candidate poses (pool lookup | view sphere | ring stack | Tammes sphere)
@@ -277,4 +279,4 @@ GPU budget on workstation B (2× RTX 6000 Ada): Isaac on GPU 0, depth prior / gs
 | Q3 | bisg integration: a read-only mount of `$KINETIX_DATA/scenes` into the sim container so `world.usd_path` can point to a Kinetix scene (small bisg compose change, done in bisg with its own docs). | K1 (pool generation) |
 | Q4 | Ground truth for real objects (T3): handheld scanner / reference photogrammetry with 300+ images? | K6 |
 | Q5 | Is the drone pose (EKF2 + ZED VIO) allowed as a prior in the paper's "monocular" claim? Default: yes, reported as an ablation (`pose_source: sfm` vs `prior`). Navigation is stereo in every mode. | paper |
-| Q6 | Stereo depth on T0 pools: FoundationStereo is the plan. Confirm after the depth study that its error vs the ZED SDK (sim) is small enough, or fit a ZED noise model `σ(z)` on GT depth instead. | K3 |
+| Q6 | Stereo depth on T0 pools. **Answered 2026-10-10 (ADR-K10):** pools store real ZED SDK depth rendered through the twin (`zed/`), and FoundationStereo stays as the fallback and as an ablation. Open: whether a 0.6 s settle per view is fast enough for the large Tammes pools (≈ 7 min / 600 views measured). | K1 |
