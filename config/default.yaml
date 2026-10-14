@@ -1,0 +1,52 @@
+# Kinetix defaults (architecture.md §10). Layered: this file < --config files < key=value overrides.
+
+camera:                          # nominal ZED Mini left rect 720p; the mavros rig replaces K with camera_info
+  width: 1280
+  height: 720
+  fx: 529.8
+  fy: 529.8
+  cx: 640.0
+  cy: 360.0
+  mount_pitch_deg: 0.0           # bisg: forward-looking, level (Q1 open)
+  t_base_cam: [0.1205, 0.0304, 0.0527]   # base_link -> left optical origin (raptor CAD mount + half baseline). Fallback only:
+                                          # the mavros rig reads it from TF (base_link -> zed_left_camera_frame_optical)
+
+coverage:                        # recon/coverage.py: the GT-free ROI-proxy coverage model
+  spacing_m: 0.04                # surface sample spacing on the ROI box
+  depth_range_m: [0.2, 4.0]
+  max_incidence_deg: 75.0        # a point counts as seen only below this angle to its normal
+  tri_min_deg: 8.0               # two rays at least this far apart = triangulable
+  novel_deg: 25.0                # extra rays count only if this far from every existing one
+  max_views: 6
+
+planner:
+  budget: 20                     # images
+  seed_views: 1                  # nearest feasible view first, then NBV
+  coverage_target: 0.95          # stop when this fraction of the ROI proxy surface is triangulated
+  min_gain: 0.005                # gain plateau: below this for `patience` steps
+  patience: 2
+  travel_weight: 0.02            # utility = gain - travel_weight * metres - yaw_weight * |dyaw| rad
+  yaw_weight: 0.005
+  clearance_m: 0.35              # drone radius + margin around no-fly boxes
+  roi_clearance_m: 0.45          # keep-out shell around the ROI (segments included)
+  rings:                         # ring-stack candidates around the ROI's vertical axis (map z)
+    radii: [1.2, 1.6]
+    heights: [1.0, 1.35, 1.7, 2.0]
+    n_az: 24
+  orbit:                         # `orbit` baseline: the ring closest to this radius/height
+    radius: 1.2
+    height: 1.35
+
+rig:
+  ns: /drone_1
+  camera_frame: zed_left_camera_frame_optical
+  setpoint_hz: 20                # wall clock; PX4 drops OFFBOARD below 2 Hz
+  tol_pos_m: 0.10
+  tol_yaw_deg: 3.0
+  tol_speed_mps: 0.05
+  settle_s: 1.0                  # sim seconds inside the tolerances before the grab
+  move_timeout_s: 60.0           # sim seconds per move
+  image_timeout_s: 10.0
+  min_rtf: 0.1                   # wall-clock backstop = sim timeout / this (a stalled /clock still times out)
+  speed_mps: 0.5                 # nominal, for the dry rig's time estimate
+  dry_noise_m: 0.0

@@ -1,0 +1,16 @@
+# kinetix container next to the bisg_isaac stack (`./bisg all` there): host network, the bisg ROS domain and DDS profile.
+#   docker compose --env-file .env -f docker/compose.yaml run --rm kinetix python3 -m kinetix run --scene config/scenes/simple_room_blocks.yaml --rig mavros
+# Run from the repo root with --env-file .env (copy .env.example): ROS_DOMAIN_ID must equal bisg's, UID/GID = `id -u`/`id -g`.
+name: kinetix
+services:
+  kinetix:
+    image: kinetix:jazzy
+    build: {context: ., dockerfile: Dockerfile}
+    network_mode: host
+    ipc: host
+    user: "${UID:-1000}:${GID:-1000}"          # run files belong to the host user
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-91}
+      CYCLONEDDS_URI: file:///kinetix/docker/cyclonedds.xml
+    volumes:
+      - ..:/kinetix:rw

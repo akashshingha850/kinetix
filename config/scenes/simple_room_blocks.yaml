@@ -1,0 +1,18 @@
+# Scene (data-format.md §1), in `map` (ENU, EKF2 origin = the drone's spawn). The sim side is bisg_isaac
+# docker/sim/sim.yaml: world "Simple Room", drone spawned at world (-2.5, 0, -0.66), two cuboids on `table_low`.
+# map = world + sim.world_to_map. A first demo scene: no scene.usd / gt_mesh yet (K1 builds those).
+name: simple_room_blocks
+source: {asset: "bisg_isaac sim.yaml objects kx_block + kx_tower (cuboids)", dataset: none, licence: n/a, redistributable: true, scale: 1.0}
+
+# Object union: world x -0.20..0.20, y -0.15..0.15, z 0.01..0.56 -> map z 0.68..1.23; ROI = that + ~5 cm
+roi:       {center: [2.5, 0.0, 0.955], size: [0.5, 0.4, 0.6], yaw_deg: 0}
+# Room inner walls world x -4.41..4.41, y -3.31..4.77, ceiling 3.41 -> minus 0.5 m margin, in map
+workspace: {center: [2.5, 0.73, 1.75], size: [7.82, 7.08, 3.7], yaw_deg: 0}
+no_fly:
+  - {center: [2.5, 0.0, 0.29], size: [3.18, 1.62, 0.78], yaw_deg: 0}   # table_low: world x -1.59..1.59, y -0.81..0.81, z -0.77..0.01
+standoff_m: [0.6, 2.0]           # camera distance to the ROI surface
+altitude_m: [0.9, 2.3]           # camera height in map (floor = map -0.11)
+standby: [0.0, 0.0, 1.35]        # camera position after takeoff: straight above the spawn point
+gt_mesh: null
+sim:
+  world_to_map: [2.5, 0.0, 0.67] # Pegasus state/pose (world) -> map, for the logged gt_pose

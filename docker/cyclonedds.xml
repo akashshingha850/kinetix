@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- CycloneDDS profile for the kinetix container. Must interoperate with bisg_isaac's containers on the same host:
+     UDP, SPDP multicast discovery, and a 16 MB receive buffer so a 1280x720 bgra8 ZED image (3.7 MB, ~57 fragments)
+     arrives whole (needs host net.core.rmem_max >= 16 MB, bisg docs/setup.md). -->
+<CycloneDDS xmlns="https://cdds.io/config">
+  <Domain Id="any">
+    <General>
+      <Interfaces><NetworkInterface autodetermine="true" priority="default" multicast="default" /></Interfaces>
+      <AllowMulticast>spdp</AllowMulticast>
+      <MaxMessageSize>65500B</MaxMessageSize>
+    </General>
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>120</MaxAutoParticipantIndex>
+    </Discovery>
+    <Internal><SocketReceiveBufferSize max="16MB" /></Internal>
+    <Tracing><Verbosity>warning</Verbosity><OutputFile>stderr</OutputFile></Tracing>
+  </Domain>
+</CycloneDDS>
