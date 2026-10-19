@@ -6,14 +6,14 @@ import time
 import numpy as np
 
 from kinetix.core.geometry import camera_yaw, wrap
-from kinetix.core.types import Candidate, RigError, Scene
+from kinetix.core.types import Candidate, RigError, Scene, shifted
 from kinetix.planner.constraints import BoxConstraints
-from kinetix.planner.sampler import RingSampler
+from kinetix.planner.sampler import GridSampler, RingSampler
 from kinetix.planner.scorers import SCORERS
 from kinetix.planner.select import select, utility
 from kinetix.planner.stop import Stop
 
-METHODS = ("roi_coverage", "random", "orbit")
+METHODS = ("roi_coverage", "random", "orbit", "tour")
 
 
 def orbit_order(cands: list[Candidate], current, radius: float, height: float) -> list[int]:
@@ -27,9 +27,88 @@ def orbit_order(cands: list[Candidate], current, radius: float, height: float) -
     return ring[start:] + ring[:start]
 
 
+def score_feasible(scorer, cands: list[Candidate], feas: np.ndarray, recon) -> np.ndarray:
+    """Scorer gains for the feasible candidates, 0 elsewhere (a room grid has thousands of candidates per step)."""
+    gains = np.zeros(len(cands))
+    idx = np.flatnonzero(feas)
+    if len(idx):
+        gains[idx] = scorer.score([cands[j] for j in idx], recon)
+    return gains
+
+
+def _apply_shift(rig, scene: Scene, recon, log) -> Scene:
+    shift = np.asarray(getattr(rig, "map_shift", np.zeros(3)), dtype=float)
+    if np.linalg.norm(shift) > 0.01:                  # the rig found the map origin elsewhere: move the scene with it
+        scene = shifted(scene, shift)
+        if hasattr(recon, "shift"):
+            recon.shift(shift)
+        log.info(f"scene shifted by {np.round(shift, 3).tolist()} m (measured map origin vs the scene's world_to_map)")
+    return scene
+
+
+def run_tour(cfg: dict, scene: Scene, rig, recon, log) -> dict:
+    """Plan the whole capture, then fly it without stopping and keep keyframes (ADR-K12, planner/tour.py)."""
+    import copy
+
+    from kinetix.planner.tour import flight_time, order_tour, sample_path, select_viewpoints, tour_length
+    from kinetix.recon.coverage import CoverageState
+    pc, tc = cfg["planner"], cfg["planner"]["tour"]
+    stop_reason = None
+    try:
+        rig.start()                                   # inside the try: a failed start still runs finish()
+        scene = _apply_shift(rig, scene, recon, log)
+        t0 = time.time()
+        g = pc["grid"]
+        sampler = GridSampler(g["spacing_m"], g["heights"], g["n_yaw"])
+        cands = sampler.sample(scene, recon, rig.caps)
+        start = rig.pose()
+        feas = BoxConstraints(pc["clearance_m"], pc["roi_clearance_m"]).feasible(cands, start, scene)
+        cc = dict(cfg["coverage"], min_shared=0, min_overlap=0.0)   # continuous capture links the views
+        plan = CoverageState.for_scene(scene, recon.K, cc)
+        vp = select_viewpoints(cands, feas, plan, tc["coverage_target"], pc["budget"])
+        poses = [cands[j].pose for j in vp]
+        order = order_tour(start, poses, tc["yaw_cost_m"])
+        tour = [poses[i] for i in order]
+        dist, yaw = tour_length(start, tour)
+        est = flight_time(dist, yaw, len(tour), cfg["rig"]["cruise_mps"], np.radians(cfg["rig"]["yaw_rate_deg_s"]))
+        rec = {"step": 0, "plan": "tour", "n_cands": len(cands), "n_feasible": int(feas.sum()), "viewpoints": len(tour),
+               "plan_coverage": round(plan.coverage, 4), "tour_m": round(dist, 1), "tour_yaw_deg": round(float(np.degrees(yaw))),
+               "est_flight_s": round(est, 1), "t_plan_s": round(time.time() - t0, 2),
+               "waypoints": [[cands[vp[i]].pool_id] for i in order]}
+        log.step(rec)
+        log.info(f"tour: {len(tour)} viewpoints (plan coverage {plan.coverage:.3f}), {dist:.0f} m, {np.degrees(yaw):.0f} deg "
+                 f"of turn, est. flight {est / 60:.1f} min, planned in {rec['t_plan_s']} s")
+        path = sample_path(start, tour, tc["path_step_m"], np.radians(tc["path_step_deg"]), rig.caps.mount_pitch_rad)
+
+        def on_frame(frame):
+            recon.add(frame)
+            log.frame(frame)
+            if frame.idx % 25 == 0:
+                log.info(f"keyframe {frame.idx}: coverage {recon.coverage:.3f} (seen {recon.seen:.3f}), "
+                         f"travel {log.travel_m:.0f} m")
+        try:
+            rig.fly_path(path, tc["keyframe_step_m"], np.radians(tc["keyframe_step_deg"]), on_frame)
+            stop_reason = "tour_done"
+        except RigError as e:
+            log.info(f"tour: {e}")
+            stop_reason = e.kind
+    finally:
+        rig.finish()
+    return {"stop_reason": stop_reason, "coverage": round(recon.coverage, 4), "seen": round(recon.seen, 4)}
+
+
 def run_session(cfg: dict, scene: Scene, rig, recon, method: str, log, seed: int = 0) -> dict:
     pc = cfg["planner"]
-    sampler = RingSampler(pc["rings"]["radii"], pc["rings"]["heights"], pc["rings"]["n_az"])
+    if method == "tour":
+        if scene.kind != "room":
+            raise ValueError("tour is a room method (grid viewpoints + TSP + continuous capture)")
+        return run_tour(cfg, scene, rig, recon, log)
+    if scene.kind == "room":
+        if method == "orbit":
+            raise ValueError("orbit is an object baseline (rings around the ROI); a room scene has no orbit")
+        sampler = GridSampler(pc["grid"]["spacing_m"], pc["grid"]["heights"], pc["grid"]["n_yaw"])
+    else:
+        sampler = RingSampler(pc["rings"]["radii"], pc["rings"]["heights"], pc["rings"]["n_az"])
     cons = BoxConstraints(pc["clearance_m"], pc["roi_clearance_m"])
     stop = Stop(pc["budget"], pc["coverage_target"], pc["min_gain"], pc["patience"])
     scorer = None if method == "orbit" else (SCORERS[method](seed) if method == "random" else SCORERS[method]())
@@ -37,8 +116,9 @@ def run_session(cfg: dict, scene: Scene, rig, recon, method: str, log, seed: int
     taken: set[str] = set()
     n = 0
     stop_reason = None
-    rig.start()
     try:
+        rig.start()                                   # inside the try: a failed start still runs finish() (lands, stops the bag)
+        scene = _apply_shift(rig, scene, recon, log)
         cands = sampler.sample(scene, recon, rig.caps)
         queue = orbit_order(cands, rig.pose(), pc["orbit"]["radius"], pc["orbit"]["height"]) if method == "orbit" else None
         last_gain = None
@@ -50,12 +130,12 @@ def run_session(cfg: dict, scene: Scene, rig, recon, method: str, log, seed: int
                 i = next((j for j in queue if cands[j].pool_id not in taken | blocked and feas[j]), None)
                 gains = np.array([recon.gain(c.pose) for c in cands])     # logged only; the order is fixed
             elif n < pc["seed_views"]:                                     # seed: the nearest feasible view
-                gains = scorer.score(cands, recon)
+                gains = score_feasible(scorer, cands, feas, recon)
                 d = np.array([np.linalg.norm(c.pose.p - current.p) + 0.3 * abs(wrap(camera_yaw(c.pose) - camera_yaw(current)))
                               for c in cands])
                 i = int(np.argmin(np.where(feas, d, np.inf))) if feas.any() else None
             else:
-                gains = scorer.score(cands, recon)
+                gains = score_feasible(scorer, cands, feas, recon)
                 i = select(cands, gains, feas, current, pc["travel_weight"], pc["yaw_weight"])
             t_score = time.time() - t0
             u = utility(cands, gains, current, pc["travel_weight"], pc["yaw_weight"])
@@ -75,8 +155,8 @@ def run_session(cfg: dict, scene: Scene, rig, recon, method: str, log, seed: int
                 rec["error"] = str(e)
                 log.step(rec)
                 log.info(f"step {n}: {e}")
-                if e.kind == "aborted":
-                    stop_reason = "aborted"
+                if e.kind in ("aborted", "no_image"):   # no image for image_timeout_s = the camera (and the ZED VIO) is
+                    stop_reason = e.kind                 # gone: land now, while EKF2 still holds position on flow + range
                     break
                 blocked.add(c.pool_id)
                 continue

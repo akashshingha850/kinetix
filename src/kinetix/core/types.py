@@ -77,7 +77,7 @@ class Box:
 @dataclass(frozen=True)
 class Scene:
     name: str
-    roi: Box
+    roi: Box                       # kind "room": the room's inner box (walls, floor, ceiling are the surface, ADR-K11)
     workspace: Box
     no_fly: tuple[Box, ...]
     standoff: tuple[float, float]  # camera distance to the ROI surface, m
@@ -85,6 +85,17 @@ class Scene:
     gt_mesh: Path | None = None
     standby: np.ndarray = field(default_factory=lambda: np.zeros(3))  # camera position the rig climbs to first (map)
     world_to_map: np.ndarray = field(default_factory=lambda: np.zeros(3))  # sim only: map = world + this (EKF2 origin = spawn)
+    kind: str = "object"           # "object" (outside-in, around the ROI) | "room" (inside-out, the ROI is the room)
+
+
+def shifted(scene: Scene, d) -> Scene:
+    """The scene moved by `d` in map (every box, standby, world_to_map): the rig measured the EKF2 origin elsewhere than the
+    scene's nominal `world_to_map` (sim: the barometric height origin differs by ~0.25 m between boots)."""
+    from dataclasses import replace
+    d = np.asarray(d, dtype=float)
+    mv = lambda b: Box(b.center + d, b.size, b.yaw)                     # noqa: E731
+    return replace(scene, roi=mv(scene.roi), workspace=mv(scene.workspace), no_fly=tuple(mv(b) for b in scene.no_fly),
+                   standby=scene.standby + d, world_to_map=scene.world_to_map + d)
 
 
 @dataclass(frozen=True)

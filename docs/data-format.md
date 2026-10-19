@@ -36,6 +36,19 @@ altitude_m: [0.4, 2.2]
 gt_mesh: gt_mesh.ply
 ```
 
+**Room scenes** (`kind: room`, ADR-K11): the whole room is the target. `roi` is the room's inner box (walls, floor, ceiling =
+the surface), `no_fly` boxes are obstacles that block flight, occlude and are surface too, `workspace` is where the camera may be,
+`standoff_m` is unused. Example `config/scenes/warehouse_room.yaml`:
+
+```yaml
+name: warehouse_room
+kind: room
+roi:       {center: [1.916, 2.9, 4.616], size: [19.34, 29.8, 9.0], yaw_deg: 0}  # inner walls / floor / ceiling, map
+workspace: {center: [2.276, 2.9, 3.016], size: [15.6, 26.8, 4.0], yaw_deg: 0}   # inner box minus margins and racks
+no_fly:    [{center: [-6.944, 4.35, 1.616], size: [1.18, 16.3, 3.0], yaw_deg: 0}]  # racks (+ cart, fuse box)
+altitude_m: [1.1, 4.9]          # camera height in map (rafters from 5.8 m)
+```
+
 ## 2. View pool — `pools/<scene>/<pool>/`
 
 ```
@@ -81,7 +94,8 @@ frames/<idx>.png   captured left images (T0: hard links into the pool)
 frames/<idx>_R.png right images (stereo_rig* modes only)
 depth/<idx>.npy    depth used for planning (+ <idx>_conf.npy), when plan_depth ≠ none
 sfm/online/        final online model (COLMAP binary)
-sfm/offline/       offline SfM over all frames
+sfm/offline/       offline SfM over all frames (`kinetix sfm`: database.db, pairs.txt, sparse/<k>/, points.ply in map, metrics.json)
+rosbag/            MCAP recording of the flight (T2/T3, `rig.bag`; topics in interfaces.md §4). Large; never in git
 recon/             dense.ply | mesh.ply | gs/ (per densifier)
 metrics.json       written by `kinetix eval`
 log.txt            human log

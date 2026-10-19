@@ -103,3 +103,55 @@ bisg `docs/zed-sdk-sim.md`) streamed teleported views of the ZED_M twin into the
 **Consequences.** One pool = one sim session with one wrapper (bisg B18). Pool rendering takes ~0.7 s per view (≈ 7 min / 600 views). Pools grow
 by two float32 maps per view. Sim stereo has no sensor noise, so sim SDK depth is an upper bound; the real half of the depth study uses
 SVO recordings (`./bisg zed record`). Q6 is closed if this is accepted.
+
+## ADR-K11 — Room scenes: the whole room is the reconstruction target (2026-10-17, accepted)
+
+**Context.** The user's target changed from one object to **photogrammetry of an entire room** (bisg's default world is now the
+Isaac Simple Warehouse, 19.3 × 29.8 × 9 m inside). The scene format (one `roi` box, `standoff_m` to its surface), the ring-stack
+sampler and the keep-out shell are object-centred (outside-in). A room is inside-out: the cameras are inside the surface they
+reconstruct, and obstacles (racks, carts) both block flight and are part of the surface.
+**Decision.** A scene declares `kind: object` (default, unchanged) or `kind: room`. In a room scene `roi` is the room's
+**inner** box: its walls, floor and ceiling (inward normals) plus the outer faces of the `no_fly` boxes are the surface proxy, and
+the `no_fly` boxes occlude it (`recon/coverage.py`, same triangulation rule as objects: two rays ≥ `tri_min_deg` apart).
+Candidates are a 4-DoF grid in the `workspace` (`planner/sampler.py` `GridSampler`). A candidate is only worth flying to if
+at least `min_overlap` of what it sees is already seen, so every new image can register in SfM (connectivity, which an
+object orbit gets for free). Room-specific defaults live in `config/room.yaml`, layered automatically after `default.yaml` for room
+scenes. The online model is still the GT-free coverage proxy; offline, `kinetix sfm` reconstructs the captured images with pycolmap
+(registration, ATE, completeness against the proxy surface). The MAVROS rig records each flight to an MCAP rosbag in the run dir.
+**Evidence (2026-10-17, Warehouse, T2).** Flight 1 (47 views planned with a 35° match limit and a 30 % overlap fraction, 351 m,
+21 min, landed): exhaustive SIFT matching "verified" 817 of 1128 pairs, most of them false matches between identical 6 m bays
+(697 fundamental-matrix fits on a calibrated camera); the one model put 28/48 cameras within 6.5 cm of GT and the other 20 6-28 m
+off. Checking every verified pair against the rig's relative pose (rotation ≤ 5°, baseline direction ≤ 30°) removes them: the model
+is then correct (24/24 cameras, ATE 6.9 cm vs GT) but only half the images connect. Measured over all pairs, P(match) is 0.36-0.48
+below 30° between the views, 0.15 at 30-45°, 0.04 at 60-90°, 0 beyond. So the room defaults are `match_max_deg` 20 and an absolute
+shared-surface gate (`min_shared` 120 points) instead of a fraction, and offline SfM pairs images by co-visibility + the rig check.
+**Consequences.** The proxy is a box room: interior structure that is not a `no_fly` box (roof rafters, wall pillars) neither occludes
+nor counts. Repetitive interiors make pure SfM unreliable without the rig poses: the rig check uses EKF2 relative poses (Q5: the
+drone pose as a prior), so `pose_source: sfm` alone is not enough here. The paper claims C1–C5 (publication-plan.md) are written for objects; whether the room becomes the paper's target or
+a second scene class is open and does not change them yet. The K3 scorers (`sfm_uncertainty`, `depth_frontier`, `combo`) will need
+the same inside-out visibility, which `recon/coverage.py` now provides.
+
+## ADR-K12 — Rooms: plan the tour before take-off, fly it continuously, triangulate at the rig poses (2026-10-18, accepted)
+
+**Context.** Stop-and-shoot NBV in the Warehouse (ADR-K11) took 12-17 min of drone time (26-28 min wall at the sim's RTF 0.47-0.6):
+62 % of it flying 6.6 m zig-zag hops at 0.8 m/s (the greedy next view ignores the route), 38 % stopping (accelerate, turn, settle,
+grab: 5.2 s per view). Planning was 2 % (0.6 s per step). The long path also made the VIO drift (random walk, 0.3-2.4 m per
+350-416 m) and exposed bisg's R9 wrapper crash (one flight lost after 24 min). The target is a 5-10 min flight. Images are cheap
+to process, flight time is not. SOTA fast aerial reconstruction plans a viewpoint set, orders it as a TSP and flies a continuous
+trajectory (PredRecon, Plan3D, FC-Planner); for repetitive interiors, SfM fails on visual aliasing (Doppelgangers++) and drifts on
+low-parallax video, and drone photogrammetry fuses the platform poses (GNSS/RTK priors).
+**Decision.** Method `tour` (`planner/tour.py`): greedy set cover of the room proxy to `planner.tour.coverage_target` (0.8)
+without travel cost, an open TSP (nearest neighbour + 2-opt, metres + 1 m per radian of turn), a dense path, and `MavrosRig.fly_path`:
+a time-parameterised carrot at `cruise_mps` 1.0 with turns paced at `yaw_rate_deg_s`, keyframes every 0.4 m / 6° from the continuous
+left stream, no stopping. Offline (`kinetix sfm`): `video` pairing (10 sequential neighbours + 8 most co-visible frames, rig-checked)
+and `pose_source: prior` (triangulate at the EKF2 poses, bundle adjustment with fixed intrinsics, re-triangulate), the default for
+tours. Stop-and-shoot (ADR-K06) stays for objects and for the NBV research loop.
+**Evidence (2026-10-18, Warehouse, T2).** Dry: 34 viewpoints, 112 m, 2.2 min est., keyframes give 0.91 proxy coverage (NBV: 71
+images, 416 m). Flown: 32 viewpoints, 108 m, **2.0 min of drone time** (5 min wall from take-off to landing), 403 keyframes, EKF2
+vs GT 0.19 m RMS (max 0.36), landed. SfM: incremental + priors registered 98 % but put the first half of the tour one bay (6 m) off;
+known-pose triangulation + BA: **403/403 cameras, ATE 8.2 cm vs GT (EKF2 itself 18.9 cm), 65 k points, 0.65 px, proxy completeness
+0.55 (sparse), 55 s of processing**.
+**Consequences.** The method needs a room map before flight (the scene file: room box + obstacles), so it is coverage planning, not
+exploration; an unknown room needs a first exploration pass. Its quality depends on the rig poses being right to a few decimetres
+over the flight, which a 2-min tour gives in the sim (the real ZED adds its 400 Hz IMU). The online coverage model is a proxy; the
+true completeness needs dense reconstruction (K2).

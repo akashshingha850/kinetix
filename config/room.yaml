@@ -1,0 +1,42 @@
+# Room-scene layer (ADR-K11): applied after default.yaml for `kind: room` scenes, before --config files and key=value.
+# Tuned on the Warehouse (19.3 x 29.8 x 9 m inside, config/scenes/warehouse_room.yaml): dry rig 69 images / 389 m to 90 %.
+
+coverage:
+  spacing_m: 0.5                 # surface sample spacing on the room/obstacle faces (~8.5 k points in the Warehouse)
+  depth_range_m: [0.3, 12.0]     # 12 m at fx 530 = 2.3 cm per pixel: still matchable texture
+  max_incidence_deg: 75.0
+  tri_min_deg: 8.0
+  novel_deg: 25.0
+  max_views: 6
+  match_max_deg: 20.0            # rays further apart than this are not counted as matchable (no triangulation, no overlap).
+                                 # Measured on the 2026-10-17 Warehouse flight (1128 pairs, SIFT + rig-checked verification):
+                                 # P(match) 0.36-0.48 below 30 deg, 0.15 at 30-45, 0.04 at 60-90, 0 beyond 90
+  min_overlap: 0.0               # (fraction gate, objects) off: a wide room view always sees mostly new surface
+  min_shared: 120                # a view must share >= this many proxy points (~30 m2) with what is already seen from a
+                                 # matchable direction; with P(match) ~0.45 per pair it needs several partners to register
+
+planner:
+  budget: 120                    # images
+  seed_views: 0                  # the first view by gain too (the nearest one may see nothing but floor)
+  coverage_target: 0.9           # of the room proxy surface triangulated
+  min_gain: 0.001                # gains are per room-surface point: one view adds ~0.5-3 %
+  patience: 3
+  travel_weight: 0.0005          # per metre: a 10 m hop costs 0.005, about a quarter of a good view's gain
+  yaw_weight: 0.0005             # per radian
+  clearance_m: 0.8               # drone radius + margin around no-fly boxes
+  grid:                          # GridSampler: candidates filling the workspace
+    spacing_m: 2.0
+    heights: [1.2, 2.8, 4.4]     # map z of the camera
+    n_yaw: 12                    # every 30 deg
+
+  tour:                          # method `tour` (ADR-K12): viewpoints + TSP + continuous capture
+    coverage_target: 0.8         # viewpoint set cover target; the path between viewpoints fills the rest (dry: 0.91 from keyframes)
+    yaw_cost_m: 1.0              # TSP cost of one radian of turn, in metres (~1 s at 1 m/s and 60 deg/s)
+    path_step_m: 0.25            # carrot path resolution
+    path_step_deg: 3.0
+    keyframe_step_m: 0.4         # keep an image every 0.4 m or 6 deg of camera motion (sequential overlap for SfM)
+    keyframe_step_deg: 6.0
+
+rig:
+  move_timeout_s: 120.0          # sim seconds per move: a 25 m hop at cruise_mps 0.8 plus settling
+  cruise_mps: 1.0                # rooms: the top of bisg's validated VIO speeds (vio_bench legs 0.5 and 1 m/s)

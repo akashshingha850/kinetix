@@ -1,0 +1,24 @@
+# Room scene (data-format.md §1, ADR-K11): photogrammetry of the whole Warehouse, in `map` (ENU, EKF2 origin = the drone's
+# spawn). The sim side is bisg_isaac docker/sim/sim.yaml: world "Warehouse" (Isaac Simple_Warehouse, floor z 0.00), drone
+# spawned at world (-2.5, 0, 0.11), no scan objects. map = world + sim.world_to_map (measured; the mavros rig re-measures it).
+# Geometry measured 2026-10-17 in bisg (USD bounding boxes + PhysX scene queries on a 0.25 m grid):
+#   inner walls world x -10.13..9.21, y -12.0..17.8; floor 0.00; ceiling panels 9.0, roof beams 8.8, rafters from 5.83 over
+#   the open floor; portal-frame columns against both long walls at y -9/-3/3/9/15 (inside the margin, not modelled).
+name: warehouse_room
+kind: room
+source: {asset: "Isaac 6.0 Environments/Simple_Warehouse/warehouse.usd (bisg world preset Warehouse)", dataset: isaac, licence: "NVIDIA Isaac Sim assets", redistributable: false, scale: 1.0}
+
+# The room's inner box (map): its walls, floor and ceiling are the surface to reconstruct.
+roi:       {center: [1.916, 2.9, 4.616], size: [19.34, 29.8, 9.0], yaw_deg: 0}
+# Where the camera may be: >= 1.5 m from the walls, east of the racks (+0.8 m clearance), world z 0.8..4.8 (rafters from 5.83)
+workspace: {center: [2.276, 2.9, 3.016], size: [15.6, 26.8, 4.0], yaw_deg: 0}
+no_fly:                          # obstacles: block flight, occlude, and are surface too (world bounds in comments)
+  - {center: [-6.944, 4.35, 1.616], size: [1.18, 16.3, 3.0], yaw_deg: 0}     # pallet racks: world x -9.91..-8.73, y -3.80..12.50, z 0..3.0
+  - {center: [-3.749, 13.625, 1.141], size: [1.95, 1.55, 2.05], yaw_deg: 0} # push cart + KLT bins: x -7.1..-5.15, y 12.85..14.4, z 0..2.05
+  - {center: [-1.694, 17.695, 0.971], size: [0.54, 0.21, 1.71], yaw_deg: 0}  # fuse box on the north wall: x -4.34..-3.80, y 17.59..17.8
+altitude_m: [1.1, 4.9]           # camera height in map (floor = map +0.12; world 1.0..4.8, rafters from 5.83)
+standby: [0.0, 0.0, 1.2]         # camera position after takeoff: straight above the spawn point
+gt_mesh: null
+sim:
+  world_to_map: [2.376, 0.0, 0.116] # Pegasus state/pose (world) -> map, measured on the ground 2026-10-17 (EKF2 body - Pegasus
+                                    # body: x = the ZED odometry origin 12 cm ahead of the body); the rig re-measures it at start

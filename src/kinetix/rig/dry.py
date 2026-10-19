@@ -34,5 +34,18 @@ class DryRig:
         return Frame(idx=idx, t=self.t, image=None, K=self.K, target=target, pose=reported, gt_pose=target,
                      travel_m=travel, pool_id=pool_id)
 
+    def fly_path(self, path, step_m: float, step_yaw: float, on_frame) -> None:
+        """Continuous flight along camera poses `path`: a keyframe whenever the camera moved `step_m` or turned `step_yaw`
+        since the last one (no stopping)."""
+        from kinetix.core.geometry import camera_yaw, wrap
+        last, idx, travel = None, 0, 0.0
+        for p in path:
+            travel += float(np.linalg.norm(p.p - self._pose.p))
+            self.t += float(np.linalg.norm(p.p - self._pose.p)) / self.caps.speed_mps
+            self._pose = p
+            if last is None or np.linalg.norm(p.p - last.p) >= step_m or abs(wrap(camera_yaw(p) - camera_yaw(last))) >= step_yaw:
+                on_frame(Frame(idx=idx, t=self.t, image=None, K=self.K, target=p, pose=p, gt_pose=p, travel_m=travel))
+                idx, last, travel = idx + 1, p, 0.0
+
     def finish(self) -> None:
         pass

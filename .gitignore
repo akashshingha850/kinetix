@@ -7,3 +7,6 @@ __pycache__/
 runs/
 data/cache/
 .env
+# flight recordings (MavrosRig rig.bag, ADR-K11): kept locally for replay, never in git
+rosbag/
+*.mcap

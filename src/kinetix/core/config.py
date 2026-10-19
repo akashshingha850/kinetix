@@ -11,6 +11,7 @@ from kinetix.core.types import Box, Scene
 
 ROOT = Path(__file__).resolve().parents[3]          # repo root (src/kinetix/core/config.py)
 DEFAULT = ROOT / "config" / "default.yaml"
+ROOM = ROOT / "config" / "room.yaml"                # layered after default.yaml for `kind: room` scenes (ADR-K11)
 
 
 def merge(a: dict, b: dict) -> dict:
@@ -36,8 +37,11 @@ def apply_overrides(cfg: dict, overrides: list[str]) -> dict:
     return cfg
 
 
-def load_config(paths: list[Path | str] = (), overrides: list[str] = ()) -> dict:
+def load_config(paths: list[Path | str] = (), overrides: list[str] = (), kind: str = "object") -> dict:
+    """default.yaml < room.yaml (room scenes only) < `paths` in order < key=value overrides."""
     cfg = yaml.safe_load(DEFAULT.read_text()) or {}
+    if kind == "room":
+        cfg = merge(cfg, yaml.safe_load(ROOM.read_text()) or {})
     for p in paths:
         cfg = merge(cfg, yaml.safe_load(Path(p).read_text()) or {})
     return apply_overrides(cfg, list(overrides))
@@ -53,14 +57,18 @@ def load_scene(path: Path | str) -> Scene:
         path = path / "scene.yaml"
     d = yaml.safe_load(path.read_text())
     gt = d.get("gt_mesh")
+    kind = d.get("kind", "object")
+    if kind not in ("object", "room"):
+        raise ValueError(f"{path}: kind {kind!r} (object | room)")
     return Scene(
         name=d["name"],
         roi=_box(d["roi"]),
         workspace=_box(d["workspace"]),
         no_fly=tuple(_box(b) for b in d.get("no_fly", [])),
-        standoff=tuple(float(x) for x in d["standoff_m"]),
+        standoff=tuple(float(x) for x in d.get("standoff_m", [0.0, float("inf")])),   # unused in room scenes
         altitude=tuple(float(x) for x in d["altitude_m"]),
         gt_mesh=(path.parent / gt) if gt else None,
         standby=np.asarray(d.get("standby", [0.0, 0.0, 1.2]), dtype=float),
         world_to_map=np.asarray(d.get("sim", {}).get("world_to_map", [0.0, 0.0, 0.0]), dtype=float),
+        kind=kind,
     )

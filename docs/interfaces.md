@@ -136,6 +136,15 @@ for drone `n` (default 1), namespace `/drone_<n>`:
 | pub | `mavros/setpoint_position/local` | `geometry_msgs/PoseStamped` | 20 Hz while OFFBOARD |
 | srv | `mavros/cmd/arming`, `mavros/set_mode` | | arm, OFFBOARD |
 
+**Flight recording** (`rig.bag.enabled`, ADR-K11): `MavrosRig.start()` launches `ros2 bag record -s mcap` into
+`<run>/rosbag/` and stops it in `finish()`. It records `rig.bag.topics` (relative to the namespace unless absolute):
+`zed/zed_node/left/color/rect/image/compressed` (JPEG, continuous), the left `camera_info`, `mavros/local_position/pose`,
+`mavros/state`, `mavros/setpoint_position/local`, `state/pose` (sim GT), `/tf`, `/tf_static`, `/clock`. The recorder is a
+separate process for later replay; nothing it records is a planner input, so it is outside the whitelist below.
+
+**Moves** (`rig.cruise_mps`): the streamed setpoint advances along the straight segment to the target at most this fast (a
+carrot), so a long room hop is flown at VIO-safe speed instead of PX4's cruise speed.
+
 **Topic whitelist per sensing mode** (ADR-K07, checked by a unit test): the rig subscribes to the
 rows marked "every mode", plus the stereo rows only when `sensing.recon_input` / `sensing.plan_depth`
 asks for them. So in `mono` the right image and depth are not subscribed at all. Never subscribed in any

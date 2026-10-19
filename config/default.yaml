@@ -50,3 +50,20 @@ rig:
   min_rtf: 0.1                   # wall-clock backstop = sim timeout / this (a stalled /clock still times out)
   speed_mps: 0.5                 # nominal, for the dry rig's time estimate
   dry_noise_m: 0.0
+  cruise_mps: 0.8                # the streamed setpoint moves to the target at most this fast (carrot; VIO-safe, bisg vio_bench legs 0.5-1 m/s)
+  yaw_rate_deg_s: 50.0           # fly_path: turns are paced at this rate (PX4 MC_YAWRATE_MAX 60 in bisg's GPS-denied mode)
+  max_lead_m: 1.5                # fly_path: the path clock pauses while the drone is further than this behind the setpoint
+  auto_world_to_map: true        # sim: measure map - world on the ground at start (EKF2 body - Pegasus body) for gt_pose; scene value if no GT
+  bag:                           # MCAP recording of the flight into <run>/rosbag/ (interfaces.md §4). Never in git (runs/ is ignored)
+    enabled: true
+    storage: mcap
+    topics:                      # relative to rig.ns unless absolute
+      - zed/zed_node/left/color/rect/image/compressed
+      - zed/zed_node/left/color/rect/camera_info
+      - mavros/local_position/pose
+      - mavros/state
+      - mavros/setpoint_position/local
+      - state/pose
+      - /tf
+      - /tf_static
+      - /clock

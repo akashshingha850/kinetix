@@ -17,6 +17,42 @@ Current phase: **K0 → K1**. Phase definitions and exit tests: [roadmap.md](roa
   The 2.0 m views put the object at the bottom image edge (level mount): evidence for Q1.
   Open: real ReconState (pycolmap) replaces the coverage proxy; ZED image stamps are wall clock in the sim (the rig takes the
   first image *received* after settle); move `config/scenes/` to `$KINETIX_DATA/scenes` with scene.usd/gt_mesh (K1)
+- [x] **Sim room = Warehouse** — 2026-10-17: bisg's default world is now Isaac's Simple Warehouse (found with NVIDIA USD
+  Search; textured, ~9 m ceiling, inner walls x -10.5..9.5 / y -12..18, obstacle-free floor x -8.5..9.0 / y -12.0..12.75, racks on
+  the west wall), its lights retuned for exposure (`sim.yaml` `light_scale`). **Target = photogrammetry of the whole room**, not an
+  object: the scan cuboids are gone from bisg `sim.yaml`, so `simple_room_blocks` no longer has its blocks (it also needs
+  `world: Simple Room`). Flown once with a temporary object scene before the change (7 images, landed); the first
+  `--rig mavros` attempt aborted "MAVROS not connected after 30 s sim" (DDS discovery, retry passed) and the process
+  segfaulted (rc 139) on exit
+- [x] **Room photogrammetry: NBV + offline SfM** — 2026-10-17 (ADR-K11). Room scenes (`kind: room`, `config/room.yaml` layer,
+  `config/scenes/warehouse_room.yaml` from bisg USD bounds + PhysX probes); `recon/coverage.py` inside-out proxy (room faces inward,
+  obstacles occlude and count), matchable-angle triangulation (`match_max_deg`), absolute shared-surface gate (`min_shared`);
+  `GridSampler` (2 m grid x 3 heights x 12 yaws, ~4000 candidates, 0.4 s per step); room constraints and safe return; `MavrosRig`
+  carrot setpoints (`cruise_mps` 0.8), measured `world_to_map` + scene shift (the EKF2 z origin moves ~0.25 m between boots),
+  MCAP rosbag per flight (`rig.bag`, `runs/<run>/rosbag/`, git-ignored); `kinetix sfm <run>` (pycolmap 4.2.1 in the image:
+  co-visibility pairs from the rig poses, every verified pair checked against the EKF2 relative pose, fixed PINHOLE K, 4° init
+  pair, ATE vs EKF2/GT, proxy completeness, `points.ply`). 21 unit tests.
+  **Flown (T2, Warehouse, lights x0.5 + ambient 2):** flight 1 (35° / 30 % overlap): 48 images, 91 % proxy coverage, 351 m, 21 min,
+  4.1 GB bag; exhaustive SfM was wrong (bay aliasing), with the rig check 24/48 registered, ATE 6.9 cm vs GT. Thresholds then
+  measured from its 1128 pairs (ADR-K11). Flight 2 (20° / 120 shared points, gain-chosen seed): 71 images, 90.3 %, 416 m, 28 min,
+  5.5 GB bag (`runs/20261017-135843_warehouse_room_roi_coverage_mavros_s0`); SfM **47/71 registered in one model, all correct:
+  ATE 8.8 cm vs GT** (EKF2 itself 1.3 m RMS off), 3941 points, reprojection 0.56 px, sparse points near 14 % of the proxy surface.
+- [x] **Fast room capture: tour + continuous capture + known-pose SfM** — 2026-10-18 (ADR-K12). `planner/tour.py` (set cover,
+  TSP 2-opt, dense path), `run_tour` in the loop, `MavrosRig.fly_path` (time-parameterised carrot, keyframes 0.4 m / 6°, writer
+  thread), `DryRig.fly_path`; `kinetix sfm`: `video` pairing, rig check keeps pose-less pairs, position priors (sfm mode),
+  `pose_source: prior` (triangulate at EKF2 poses + BA), the default for tours. Camera loss (`no_image`) now aborts and lands at once:
+  in the 2026-10-17 abort the ZED wrapper died (bisg R9) and EKF2 held position on flow + range (eph +2.5 cm/s), but the session
+  retried for 95 s until PX4 fell to ALTCTL. Flown: 2.0 min of drone time, 108 m, 403 keyframes; SfM 403/403, ATE 8.2 cm vs GT,
+  65 k points, 55 s (`runs/20261018-152242_warehouse_room_tour_mavros_s0`, 1 GB bag). 23 unit tests
+- [x] Room SfM registration: solved for tours by continuous keyframes + known-pose triangulation (403/403, ADR-K12); stop-and-shoot NBV
+  still registers 2/3 (incremental SfM + priors puts blocks one bay off in this repetitive hall)
+- [ ] Dense reconstruction (K2 `offline/densify.py`, COLMAP MVS or gsplat) for a real completeness number: sparse SIFT points cannot
+  cover the 0.5 m proxy grid, so `completeness_proxy` from the sparse cloud is a lower bound
+- [ ] Long flights drift: EKF2 horizontal error grows to 2.4 m over 416 m (bisg VIO; its bench flies 26 m); a 108 m tour stays at 0.19 m RMS.
+  Keep room flights to tours (2-3 min); loop closure (ZED GEN_3 area memory) is the next bisg step for longer ones
+- [ ] Tour follow-ups: re-plan online from the keyframes' real coverage (dry 0.91 vs flown 0.79: the drone lags the carrot in turns);
+  try cruise 1.5 m/s (motion blur on the real ZED: exposure vs speed); dense reconstruction for a real completeness figure
+- [ ] Paper scope: C1-C5 are written for objects; decide whether rooms become the target or a second scene class (ADR-K11)
 - [x] K0 doc set (architecture, interfaces, data-format, roadmap, testing, benchmark, decisions, setup) — 2026-10-08
 - [x] K0 Python env (`pyproject.toml`, `uv.lock`), `scripts/check_env.py` passes on workstation B — 2026-10-08
 - [x] Mono-vs-stereo study (`docs/research/mono-vs-stereo.md`). Plan updated: ADR-K07 sensing axes, stereo in pools/interfaces/benchmark/roadmap — 2026-10-08

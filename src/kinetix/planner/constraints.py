@@ -1,6 +1,6 @@
 """Feasibility (architecture.md §8): inside the workspace, at an allowed altitude, outside the no-fly boxes, inside the
-ROI standoff shell, and the straight segment from the current camera position clears every box. v1 has no path planner:
-a blocked segment drops the candidate."""
+ROI standoff shell (object scenes only; in a room scene the camera is inside the ROI, ADR-K11), and the straight segment from
+the current camera position clears every box. v1 has no path planner: a blocked segment drops the candidate."""
 from __future__ import annotations
 
 import numpy as np
@@ -15,7 +15,10 @@ class BoxConstraints:
         self.roi_clearance = roi_clearance_m    # never fly closer than this to the ROI box (segments included)
 
     def feasible(self, cands: list[Candidate], current: Pose, scene: Scene, blocked: set | None = None) -> np.ndarray:
-        boxes = [b.inflated(self.clearance) for b in scene.no_fly] + [scene.roi.inflated(self.roi_clearance)]
+        room = scene.kind == "room"
+        boxes = [b.inflated(self.clearance) for b in scene.no_fly]
+        if not room:
+            boxes.append(scene.roi.inflated(self.roi_clearance))
         mask = np.zeros(len(cands), dtype=bool)
         for i, c in enumerate(cands):
             p = c.pose.p
@@ -23,7 +26,7 @@ class BoxConstraints:
                 continue
             if not inside(p, scene.workspace) or not (scene.altitude[0] <= p[2] <= scene.altitude[1]):
                 continue
-            if not (scene.standoff[0] <= point_box_distance(p, scene.roi) <= scene.standoff[1]):
+            if not room and not (scene.standoff[0] <= point_box_distance(p, scene.roi) <= scene.standoff[1]):
                 continue
             if any(inside(p, b) for b in boxes):
                 continue
