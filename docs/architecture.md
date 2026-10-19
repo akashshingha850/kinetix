@@ -1,6 +1,6 @@
 # Kinetix architecture
 
-Status: **design, K0** (no runtime code yet). Research framing: [research/idea.md](research/idea.md).
+Status: **K1** (object demo loop and room capture run on the bisg twin; pools, ReconState and the K3 scorers are not built). Research framing: [research/idea.md](research/idea.md).
 Related docs: [interfaces.md](interfaces.md) (APIs, ROS topics, frames), [data-format.md](data-format.md)
 (on-disk layouts), [roadmap.md](roadmap.md) (phases + exit tests), [testing.md](testing.md),
 [benchmark.md](benchmark.md), [decisions.md](decisions.md) (ADRs).
@@ -12,6 +12,10 @@ reconstructs the object with a standard photogrammetry pipeline (COLMAP-format S
 Gaussian Splatting). The primary method is **monocular**. Because the drone carries a ZED Mini, the
 same loop also runs with **stereo** inputs as a measured comparison (§2a,
 [research/mono-vs-stereo.md](research/mono-vs-stereo.md)).
+
+A scene is either an **object** (cameras outside, around one ROI box) or a **room** (cameras inside; the room's walls, floor,
+ceiling and obstacles are the target; ADR-K11). Rooms use a separate capture method that plans the whole flight first and flies
+it without stopping (§5a, ADR-K12).
 
 ```
  seed views ──► capture ──► update online SfM ──► score candidate views ──► pick next view ──┐
@@ -99,7 +103,8 @@ becomes a real pool.
 
 ## 4. Module map
 
-Target layout (created incrementally per [roadmap.md](roadmap.md); nothing below exists yet except `scripts/`):
+Target layout (created incrementally per [roadmap.md](roadmap.md); built so far: `core/`, `rig/` dry + mavros, `recon/coverage.py` +
+`align.py`, `planner/` loop/sampler/constraints/select/stop/tour + scorers random/roi_coverage, `offline/sfm.py`, `cli.py`):
 
 ```
 src/kinetix/
@@ -117,7 +122,8 @@ src/kinetix/
                               stereo_learned.py (FoundationStereo | SGBM) · stereo_zed.py (T2/T3 topic, or the pool's `zed/` depth on T0/T1) · gt.py
   planner/     loop.py        the session loop (§5) — the only orchestrator
                seed.py        initial views (e.g. 4-6 views on a ring around the ROI)
-               sampler.py     candidate poses (pool lookup | view sphere | ring stack | Tammes sphere)
+               sampler.py     candidate poses (pool lookup | view sphere | ring stack | Tammes sphere | room grid)
+               tour.py        rooms: set cover, TSP order, dense path (method `tour`, §5a)
                constraints.py workspace box, no-fly boxes, standoff, altitude, straight-line path check
                select.py      argmax of gain − λ·travel cost
                stop.py        budget / time / gain plateau
@@ -125,7 +131,7 @@ src/kinetix/
                scorers/       random · fvs · volumetric_ig · coverage_oracle · sfm_uncertainty · depth_frontier · combo
                external/      wrappers for third-party pool baselines: fisherrf.py, ma_scvp.py (their code runs in
                               its own env/container; the wrapper only exchanges candidate ids and scores)
-  offline/     sfm.py         final SfM over all captured frames (pycolmap)
+  offline/     sfm.py         final SfM over all captured frames (pycolmap; video/covis pairing, rig check, known-pose mode)
                densify.py     backends: colmap_mvs (CUDA COLMAP container) | gsplat (+ TSDF mesh)
                metrics.py     accuracy, completeness, Chamfer, F-score, ATE, PSNR/SSIM
                evaluate.py    run dir → metrics.json
@@ -174,11 +180,35 @@ def run_session(cfg, rig, recon, planner, log):
     log.close(recon)                              # write sfm/ snapshot, run.yaml summary
 ```
 
-- **Stop-and-shoot** in v1: the rig flies to the pose, settles, then grabs one frame. Capturing
-  while moving is a K5 optimization.
+- **Stop-and-shoot** for objects and the NBV research loop: the rig flies to the pose, settles, then grabs one frame. Rooms
+  capture while moving (§5a).
 - **Baselines are configs.** `orbit` / `grid` use `sequence.py` (the planner returns the next pose
   of a fixed list, no scorer); `random` uses the random scorer; `oracle` uses `coverage_oracle`
   (sim only, reads GT, flagged `uses_gt: true` and reported as an upper bound).
+
+## 5a. Room capture: method `tour` (ADR-K11, ADR-K12)
+
+Rooms are large, so flight time dominates (stop-and-shoot NBV took 12-17 min of drone time in the Warehouse, 62 % of it in
+zig-zag travel, 38 % stopping); images are cheap. `tour` plans before take-off and never stops:
+
+1. **Viewpoints**: `GridSampler` (2 m grid × 3 heights × 12 yaws in the scene's `workspace`) → greedy set cover of the room proxy
+   (`recon/coverage.py`: room faces inward, obstacles occlude and count, triangulation needs two rays 8-20° apart) up to
+   `planner.tour.coverage_target` (0.8).
+2. **Order**: open TSP from the take-off pose (nearest neighbour + 2-opt; metres + `yaw_cost_m` per radian of turn).
+3. **Fly**: `rig.fly_path` streams a time-parameterised setpoint along the dense path at `rig.cruise_mps` (1.0) with turns paced
+   at `yaw_rate_deg_s`, and keeps a keyframe every 0.4 m / 6° of camera motion from the continuous left stream. The flight is
+   recorded to `<run>/rosbag/` (MCAP).
+4. **Reconstruct offline**: `kinetix sfm <run>` matches each keyframe with its 10 successors and its 8 most co-visible frames,
+   checks every verified pair against the rig's relative pose (repeated bays alias), triangulates at the rig (EKF2) poses and
+   refines with bundle adjustment (`pose_source: prior`). Pure incremental SfM (`--pose-source sfm`) put whole blocks of a
+   tour one 6 m bay off.
+
+2026-10-18 in the Warehouse: 2.0 min of drone time, 108 m, 403 keyframes; SfM 403/403, ATE 8.2 cm vs GT, 55 s of processing.
+The room box and obstacles come from the scene file, so this is coverage planning of a known room, not exploration.
+
+```
+METHOD=tour scripts/room_scan.sh all          # bisg sim up -> fly -> kinetix sfm (scripts/room_scan.sh sfm [RUN] re-runs SfM)
+```
 
 ## 6. Online reconstruction (`recon/state.py`)
 

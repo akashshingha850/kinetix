@@ -2,10 +2,12 @@
 
 *Fewer flights. Smarter views. Better models.*
 
-Adaptive next-best-view photogrammetry of indoor objects with a monocular drone. Simulation and flight run on the
-`bisg_isaac` digital twin (`~/bisg_isaac`) (Isaac Sim 6.0 + Pegasus + PX4 + MAVROS).
+Adaptive next-best-view photogrammetry of indoor objects and whole rooms with a monocular drone. Simulation and flight run on
+the `bisg_isaac` digital twin (`~/bisg_isaac`) (Isaac Sim 6.0 + Pegasus + PX4 + MAVROS).
 
-**Status:** K0, design and environment. No runtime code yet. See [docs/todo.md](docs/todo.md).
+**Status:** K1. The object demo loop and whole-room capture fly on the bisg twin: a planned 2-minute tour of the Warehouse
+reconstructs with every keyframe registered and 8 cm camera error (`METHOD=tour scripts/room_scan.sh all`,
+[architecture.md](docs/architecture.md) §5a). Pools, online SfM and the K3 scorers are next. See [docs/todo.md](docs/todo.md).
 
 ## Quick start
 

@@ -1,6 +1,6 @@
 # kinetix: instructions for Claude Code
 
-Adaptive NBV photogrammetry for indoor objects with a monocular drone. Read `docs/architecture.md` first,
+Adaptive NBV photogrammetry for indoor objects and whole rooms (ADR-K11/K12) with a monocular drone. Read `docs/architecture.md` first,
 then `docs/todo.md` for the current phase. Update `docs/todo.md` when work is finished.
 
 - Build phase by phase (`docs/roadmap.md`, K0–K6). Do not start a later phase or widen scope unless asked.
@@ -16,3 +16,5 @@ then `docs/todo.md` for the current phase. Update `docs/todo.md` when work is fi
 - Large data lives in `$KINETIX_DATA` (outside the repo). Only `tests/fixtures/` is in git (git-lfs).
 - Before a sim run on workstation B, check `nvidia-smi` and stop `lc-chat` (vLLM) if it holds VRAM.
 - Tests: `uv run pytest` (unit + t0). `-m t1` / `-m t2` need the sim (`docs/testing.md`).
+- Rooms (`kind: room` scenes): method `tour` + `kinetix sfm` (known-pose triangulation) is the capture path; each flight records an
+  MCAP rosbag to `runs/<run>/rosbag/` (git-ignored, GBs). Room numbers in the docs are from the bisg Warehouse at its default lighting.

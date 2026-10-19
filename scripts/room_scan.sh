@@ -8,7 +8,8 @@
 #   scripts/room_scan.sh stop       stop the bisg sim
 #
 # Env: BISG_DIR (default ~/Documents/bisg_isaac), SCENE (default config/scenes/warehouse_room.yaml),
-#      METHOD (roi_coverage|orbit|random), SEED, GUI=1 (sim with a window instead of headless).
+#      METHOD (roi_coverage = stop-and-shoot NBV, ~25 min wall | tour = planned continuous tour, ~5 min wall, ADR-K12),
+#      SEED, GUI=1 (sim with a window instead of headless).
 set -euo pipefail
 
 KX="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -48,7 +49,7 @@ sim_up(){
 }
 
 fly(){
-  say "flying the capture: scene=$SCENE method=$METHOD seed=$SEED (~20-30 min wall)"
+  say "flying the capture: scene=$SCENE method=$METHOD seed=$SEED (tour ~5 min, roi_coverage ~25 min wall)"
   kx python3 -m kinetix run --scene "$SCENE" --method "$METHOD" --rig mavros --seed "$SEED"
   say "run: $(latest_run)"
 }

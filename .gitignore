@@ -10,3 +10,9 @@ data/cache/
 # flight recordings (MavrosRig rig.bag, ADR-K11): kept locally for replay, never in git
 rosbag/
 *.mcap
+
+# graphify: graph.json, report, manifest and labels may be tracked; derived or machine-specific files are not
+graphify-out/graph.html
+graphify-out/cache/
+graphify-out/.graphify_root
+graphify-out/.graphify_python

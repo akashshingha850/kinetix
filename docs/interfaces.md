@@ -74,6 +74,10 @@ class Rig(Protocol):
     def start(self) -> None: ...
     def pose(self) -> Pose: ...
     def capture_at(self, target: Pose) -> Frame: ...      # move, settle, grab; raises RigError
+    def fly_path(self, path: list[Pose], step_m: float, step_yaw: float,
+                 on_frame: Callable[[Frame], None]) -> None: ...  # rooms (ADR-K12): fly camera poses without stopping, keyframe
+                                   # every step_m / step_yaw of camera motion; raises RigError (no_image, timeout, aborted)
+    map_shift: np.ndarray          # optional (mavros): measured minus nominal world_to_map; the loop moves the scene by it
     def finish(self) -> None: ...
 
 class Sampler(Protocol):
