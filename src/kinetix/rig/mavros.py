@@ -168,11 +168,16 @@ class MavrosRig:
             time.sleep(period)
 
     def _wait(self, cond, timeout_sim: float, what: str, kind: str = "timeout"):
-        """Poll `cond` until true; the timeout is in sim seconds, with a wall-clock backstop for a stalled /clock."""
-        t_end = self.now() + timeout_sim
+        """Poll `cond` until true; the timeout is in sim seconds, with a wall-clock backstop for a stalled /clock.
+        The sim deadline is anchored on the first /clock: before it now() is 0, and a sim already running for minutes
+        would otherwise jump past a deadline taken at 0 the moment /clock arrives."""
+        t_end = None
         wall_end = time.time() + timeout_sim / float(self.rc["min_rtf"])
         while not cond():
-            if self.now() > t_end or time.time() > wall_end:
+            now = self.now()
+            if t_end is None and now > 0.0:
+                t_end = now + timeout_sim
+            if (t_end is not None and now > t_end) or time.time() > wall_end:
                 raise RigError(kind, f"{what} after {timeout_sim:.0f} s sim")
             time.sleep(0.05)
 
