@@ -135,6 +135,7 @@ for drone `n` (default 1), namespace `/drone_<n>`:
 | sub | `zed/zed_node/left/color/rect/camera_info` | `sensor_msgs/CameraInfo` | `Frame.K` (never hard-code K) |
 | sub (stereo_rig*) | `zed/zed_node/right/color/rect/image` + `right/.../camera_info` | `Image`, `CameraInfo` | `Frame.right_image`, baseline `-P[0,3]/P[0,0]` |
 | sub (plan_depth=stereo) | `zed/zed_node/depth/depth_registered` | `Image` 32FC1 m | `stereo_zed` depth source |
+| sub (`rig.save_depth`, room scenes) | `zed/zed_node/depth/depth_registered` | `Image` 32FC1 m | recorded only: `<run>/depth/<idx>.npy` + `Frame.depth_file` (`depth_source: zed`), matched to the left image by stamp; never a planner input |
 | sub | `tf_static` | | `T_base_cam` (base_link → zed_left_camera_optical_frame) |
 | sub (sim, eval only) | `state/pose` | `geometry_msgs/PoseStamped` | Pegasus ground truth → `Frame.gt_pose` |
 | pub | `mavros/setpoint_position/local` | `geometry_msgs/PoseStamped` | 20 Hz while OFFBOARD |

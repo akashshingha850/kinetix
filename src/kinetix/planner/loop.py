@@ -46,25 +46,48 @@ def _apply_shift(rig, scene: Scene, recon, log) -> Scene:
     return scene
 
 
-def run_tour(cfg: dict, scene: Scene, rig, recon, log) -> dict:
-    """Plan the whole capture, then fly it without stopping and keep keyframes (ADR-K12, planner/tour.py)."""
+def run_tour(cfg: dict, scene: Scene, rig, recon, log, truth: Scene | None = None) -> dict:
+    """Plan the whole capture, then fly it without stopping and keep keyframes (ADR-K12, planner/tour.py). With
+    `explore.enabled` (ADR-K13) the room is not read from the scene file: the drone first explores it with the ZED depth
+    (planner/explore.py) and the tour is planned on the fitted scene; `truth` (sim) only scores that fit."""
     import copy
 
     from kinetix.planner.tour import flight_time, order_tour, sample_path, select_viewpoints, tour_length
     from kinetix.recon.coverage import CoverageState
     pc, tc = cfg["planner"], cfg["planner"]["tour"]
-    stop_reason = None
+    stop_reason, explored = None, []
     try:
         rig.start()                                   # inside the try: a failed start still runs finish()
-        scene = _apply_shift(rig, scene, recon, log)
+        if cfg.get("explore", {}).get("enabled"):
+            from kinetix.planner.explore import run_explore
+            shift = np.asarray(getattr(rig, "map_shift", np.zeros(3)), dtype=float)
+            scene, rep = run_explore(cfg, scene, rig, log, shifted(truth, shift) if truth is not None else None, explored)
+            if scene is None:
+                return {"stop_reason": "explore_failed", "coverage": 0.0, "seen": 0.0}
+            seen = {k: v for k, v in rep["faces"].items() if k != "ceiling"}      # the ceiling is far and often out of range
+            if min(seen.values()) < cfg["explore"]["tour_min_wall"]:
+                log.info(f"explore: {min(seen, key=seen.get)} seen only {min(seen.values()):.0%} (stop: {rep['stop_reason']}): the "
+                         "fitted room is not trustworthy, landing instead of touring it")
+                return {"stop_reason": "explore_incomplete", "coverage": 0.0, "seen": 0.0}
+            recon = CoverageState.for_scene(scene, recon.K, cfg["coverage"])
+            for f in explored:                        # what exploration already saw counts: the tour flies the gaps
+                recon.add(f)
+            log.info(f"tour on the explored room (stop: {rep['stop_reason']}); {len(explored)} reused views cover {recon.coverage:.3f}")
+        else:
+            scene = _apply_shift(rig, scene, recon, log)
         t0 = time.time()
         g = pc["grid"]
         sampler = GridSampler(g["spacing_m"], g["heights"], g["n_yaw"])
         cands = sampler.sample(scene, recon, rig.caps)
         start = rig.pose()
         feas = BoxConstraints(pc["clearance_m"], pc["roi_clearance_m"]).feasible(cands, start, scene)
+        if not feas.any():                            # e.g. the start is inside an obstacle's keep-out box: land instead of crashing
+            log.info(f"tour: none of {len(cands)} candidate viewpoints is feasible from here")
+            return {"stop_reason": "no_feasible_view", "coverage": round(recon.coverage, 4), "seen": round(recon.seen, 4)}
         cc = dict(cfg["coverage"], min_shared=0, min_overlap=0.0)   # continuous capture links the views
         plan = CoverageState.for_scene(scene, recon.K, cc)
+        for f in explored:
+            plan.add(f)
         vp = select_viewpoints(cands, feas, plan, tc["coverage_target"], pc["budget"])
         poses = [cands[j].pose for j in vp]
         order = order_tour(start, poses, tc["yaw_cost_m"])
@@ -97,12 +120,12 @@ def run_tour(cfg: dict, scene: Scene, rig, recon, log) -> dict:
     return {"stop_reason": stop_reason, "coverage": round(recon.coverage, 4), "seen": round(recon.seen, 4)}
 
 
-def run_session(cfg: dict, scene: Scene, rig, recon, method: str, log, seed: int = 0) -> dict:
+def run_session(cfg: dict, scene: Scene, rig, recon, method: str, log, seed: int = 0, truth: Scene | None = None) -> dict:
     pc = cfg["planner"]
     if method == "tour":
         if scene.kind != "room":
             raise ValueError("tour is a room method (grid viewpoints + TSP + continuous capture)")
-        return run_tour(cfg, scene, rig, recon, log)
+        return run_tour(cfg, scene, rig, recon, log, truth)
     if scene.kind == "room":
         if method == "orbit":
             raise ValueError("orbit is an object baseline (rings around the ROI); a room scene has no orbit")
@@ -115,6 +138,7 @@ def run_session(cfg: dict, scene: Scene, rig, recon, method: str, log, seed: int
     blocked: set[str] = set()
     taken: set[str] = set()
     n = 0
+    timeouts = 0                                      # consecutive failed moves; a rig that can no longer settle must not loop forever
     stop_reason = None
     try:
         rig.start()                                   # inside the try: a failed start still runs finish() (lands, stops the bag)
@@ -159,7 +183,13 @@ def run_session(cfg: dict, scene: Scene, rig, recon, method: str, log, seed: int
                     stop_reason = e.kind                 # gone: land now, while EKF2 still holds position on flow + range
                     break
                 blocked.add(c.pool_id)
+                timeouts += 1
+                if timeouts >= pc["max_consecutive_timeouts"]:
+                    log.info(f"{timeouts} moves in a row timed out: stopping")
+                    stop_reason = "stalled"
+                    break
                 continue
+            timeouts = 0
             seen = recon.add(frame)
             taken.add(c.pool_id)
             last_gain = float(gains[i])

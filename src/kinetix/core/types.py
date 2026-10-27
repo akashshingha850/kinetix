@@ -41,10 +41,13 @@ class Frame:
     gt_pose: Pose | None           # sim only; never read by planner/recon
     travel_m: float                # path length flown since the previous frame
     pool_id: str | None = None
+    depth: object | None = field(default=None, compare=False, repr=False)   # sensor depth (H, W) float32 m, optical z; not serialised
+    depth_file: Path | None = None  # relative to the run dir: the ZED depth of this frame saved by the rig (`rig.save_depth`)
 
     def to_dict(self) -> dict:
         return {"idx": self.idx, "t": round(self.t, 3), "image": str(self.image) if self.image else None,
-                "right_image": None, "depth": None, "depth_source": None, "K": self.K.to_dict(),
+                "right_image": None, "depth": str(self.depth_file) if self.depth_file else None,
+                "depth_source": "zed" if self.depth_file else None, "K": self.K.to_dict(),
                 "target": self.target.to_dict(), "pose": self.pose.to_dict(),
                 "gt_pose": self.gt_pose.to_dict() if self.gt_pose else None,
                 "travel_m": round(self.travel_m, 3), "pool_id": self.pool_id}

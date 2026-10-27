@@ -58,6 +58,8 @@ class MavrosRig:
         self.sensor_qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.BEST_EFFORT, history=HistoryPolicy.KEEP_LAST)
         be10 = QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT, history=HistoryPolicy.KEEP_LAST)
         self.lock = threading.Lock()
+        self._dead = None                       # why the rig can no longer fly (stream thread crashed); _check_alive raises it
+        self._rx_wall = time.time()             # wall time of the last mavros state / local pose message
         self.state = None
         self.body = None                        # (p, q) latest local_position/pose, map ENU
         self.gt = None                          # (p, q) latest Pegasus state/pose, world ENU
@@ -96,9 +98,11 @@ class MavrosRig:
 
     # --- callbacks ----------------------------------------------------------------------------------------------------
     def _on_state(self, m):
+        self._rx_wall = time.time()
         self.state = m
 
     def _on_pose(self, m):
+        self._rx_wall = time.time()
         p = np.array([m.pose.position.x, m.pose.position.y, m.pose.position.z])
         q = np.array([m.pose.orientation.x, m.pose.orientation.y, m.pose.orientation.z, m.pose.orientation.w])
         with self.lock:
@@ -152,19 +156,25 @@ class MavrosRig:
     def _stream_loop(self):
         period = 1.0 / float(self.rc["setpoint_hz"])
         while self._stream_on:
-            sp = self.sp
-            if self.path is not None:
-                pos, yaw = self._path_setpoint()
-                sp = (pos, yaw)
-            if sp is not None:
-                pos = sp[0] if self.path is not None else self._carrot(sp[0])
-                m = self._PoseStamped()
-                m.header.stamp = self.node.get_clock().now().to_msg()
-                m.header.frame_id = "map"
-                m.pose.position.x, m.pose.position.y, m.pose.position.z = (float(v) for v in pos)
-                qx, qy, qz, qw = R_to_quat(rot_z(sp[1]))
-                m.pose.orientation.x, m.pose.orientation.y, m.pose.orientation.z, m.pose.orientation.w = qx, qy, qz, qw
-                self.sp_pub.publish(m)
+            try:
+                sp = self.sp
+                if self.path is not None:
+                    pos, yaw = self._path_setpoint()
+                    sp = (pos, yaw)
+                if sp is not None:
+                    pos = sp[0] if self.path is not None else self._carrot(sp[0])
+                    m = self._PoseStamped()
+                    m.header.stamp = self.node.get_clock().now().to_msg()
+                    m.header.frame_id = "map"
+                    m.pose.position.x, m.pose.position.y, m.pose.position.z = (float(v) for v in pos)
+                    qx, qy, qz, qw = R_to_quat(rot_z(sp[1]))
+                    m.pose.orientation.x, m.pose.orientation.y, m.pose.orientation.z, m.pose.orientation.w = qx, qy, qz, qw
+                    self.sp_pub.publish(m)
+            except Exception as e:  # noqa: BLE001 (a dead stream drops OFFBOARD: say so, the waits abort on it)
+                if self._stream_on:
+                    self._dead = f"setpoint stream died: {type(e).__name__}: {e}"
+                    print(f"[mavros-rig] {self._dead}", flush=True)
+                return
             time.sleep(period)
 
     def _wait(self, cond, timeout_sim: float, what: str, kind: str = "timeout"):
@@ -174,6 +184,8 @@ class MavrosRig:
         t_end = None
         wall_end = time.time() + timeout_sim / float(self.rc["min_rtf"])
         while not cond():
+            self._check_alive()
+            self._check_diverged()
             now = self.now()
             if t_end is None and now > 0.0:
                 t_end = now + timeout_sim
@@ -235,8 +247,26 @@ class MavrosRig:
             return self.now() - since[0] >= settle
         self._wait(settled, timeout_sim, f"not settled at {np.round(p, 2).tolist()}")
 
+    def _check_diverged(self):
+        """EKF2 says the drone moves faster than it can: the estimate has diverged (sim: 45 m jumps), whatever it really does."""
+        v = self._speed()
+        if self.started and np.isfinite(v) and v > float(self.rc["max_speed_mps"]):
+            raise RigError("aborted", f"EKF2 speed {v:.1f} m/s is not physical (> {self.rc['max_speed_mps']} m/s): the estimate diverged")
+
     def _check_alive(self):
-        if self.started and self.state is not None and (not self.state.armed or self.state.mode != "OFFBOARD"):
+        """Raise RigError(aborted) when the rig can no longer fly: the stream thread died, the ROS context is gone, mavros has
+        been silent for rig.silent_timeout_s wall seconds while flying, or the vehicle left OFFBOARD. Without this a dead
+        context leaves /clock and mavros/state frozen at their last values and every wait just runs into its wall backstop."""
+        if self._dead is not None:
+            raise RigError("aborted", self._dead)
+        if not self._rclpy.ok():
+            raise RigError("aborted", "ROS context shut down")
+        if not self.started:
+            return
+        silent = time.time() - self._rx_wall
+        if silent > float(self.rc["silent_timeout_s"]):
+            raise RigError("aborted", f"no mavros state/pose for {silent:.0f} s (sim, DDS or mavros down)")
+        if self.state is not None and (not self.state.armed or self.state.mode != "OFFBOARD"):
             raise RigError("aborted", f"vehicle left OFFBOARD (mode {self.state.mode}, armed {self.state.armed})")
 
     def _lookup_mount(self):
@@ -362,14 +392,32 @@ class MavrosRig:
                 got["msg"] = m
         sub = self.node.create_subscription(self._Image, f"{self.ns}/zed/zed_node/left/color/rect/image", on_img,
                                             self.sensor_qos)
+        save_depth = bool(self.rc.get("save_depth"))                            # the ZED depth of every frame goes to <run>/depth/
+        want_depth = bool(self.cfg.get("explore", {}).get("enabled")) or save_depth   # exploration maps the ZED depth (planner/explore.py)
+        got_d = {}
+
+        def on_depth(m):
+            if "m" not in got_d and self.now() >= t_settled:
+                got_d["m"] = m
+        dsub = (self.node.create_subscription(self._Image, f"{self.ns}/{self.rc['depth_topic']}", on_depth, self.sensor_qos)
+                if want_depth else None)
         try:
             self._wait(lambda: "msg" in got, self.rc["image_timeout_s"], "no left image", "no_image")
+            if want_depth:
+                self._wait(lambda: "m" in got_d, self.rc["image_timeout_s"], "no depth image", "no_image")
         finally:
             self.node.destroy_subscription(sub)
+            if dsub is not None:
+                self.node.destroy_subscription(dsub)
+        depth = None
+        if want_depth:
+            dm = got_d["m"]
+            depth = np.frombuffer(dm.data, dtype=np.float32).reshape(dm.height, dm.width).copy()   # 32FC1 metres, NaN = no return
         img = to_bgr(got["msg"])
         rel = Path("frames") / f"{idx:06d}.png"
         import cv2
         cv2.imwrite(str(self.run_dir / rel), img)
+        depth_file = self._save_depth(idx, depth) if save_depth else None
         pose = camera_from_body(*got["body"], self.t_base_cam, self.mount_pitch)
         gt_pose = None
         if got["gt"] is not None:
@@ -378,7 +426,23 @@ class MavrosRig:
         with self.lock:
             travel = self.odo - odo0
         return Frame(idx=idx, t=got["t"], image=rel, K=self.K, target=target, pose=pose, gt_pose=gt_pose,
-                     travel_m=travel, pool_id=pool_id)
+                     travel_m=travel, pool_id=pool_id, depth=depth, depth_file=depth_file)
+
+    def _save_depth(self, idx: int, depth: np.ndarray) -> Path:
+        """<run>/depth/<idx>.npy: float32 metres along the optical z, registered to the left image, NaN = no return."""
+        rel = Path("depth") / f"{idx:06d}.npy"
+        (self.run_dir / "depth").mkdir(exist_ok=True)
+        np.save(self.run_dir / rel, depth)
+        return rel
+
+    def _depth_for(self, stamp, recent: dict):
+        """The depth image of the same grab as an image stamped `stamp` (the wrapper publishes both with one stamp); the nearest
+        stamp if the exact one is gone, None when no depth has arrived."""
+        if not recent:
+            return None
+        key = min(recent, key=lambda k: abs(k - stamp)) if stamp not in recent else stamp
+        m = recent[key]
+        return np.frombuffer(bytes(m.data), dtype=np.float32).reshape(m.height, m.width).copy()
 
     def _safe_return_z(self, p) -> float:
         """Height to fly home at. Object scenes: above the ROI keep-out. Room scenes (ADR-K11): the current height, raised over
@@ -411,9 +475,18 @@ class MavrosRig:
         self._goto_body(P[0], Y[0], self.rc["move_timeout_s"], settle_s=0.5)
         state = {"last": None, "idx": 0, "odo": self.odo, "t_img": self.now(), "err": None}
         q: queue.Queue = queue.Queue(maxsize=64)
+        save_depth = bool(self.rc.get("save_depth"))
+        recent_d: dict = {}                                    # stamp (ns) -> depth Image, the last few
+
+        def on_depth(m):
+            recent_d[m.header.stamp.sec * 10**9 + m.header.stamp.nanosec] = m
+            while len(recent_d) > 6:
+                recent_d.pop(min(recent_d))
 
         def on_img(m):
             state["t_img"] = self.now()
+            if save_depth and not recent_d:                    # no depth yet: no keyframe (every frame has pose + depth)
+                return
             with self.lock:
                 bp, bq = self.body[0].copy(), self.body[1].copy()
                 odo = self.odo
@@ -423,8 +496,9 @@ class MavrosRig:
                 return
             state["last"] = pose
             gt = self.gt
+            dep = self._depth_for(m.header.stamp.sec * 10**9 + m.header.stamp.nanosec, dict(recent_d)) if save_depth else None
             try:
-                q.put_nowait((state["idx"], self.now(), m, pose, gt, odo - state["odo"]))
+                q.put_nowait((state["idx"], self.now(), m, pose, gt, odo - state["odo"], dep))
             except queue.Full:                         # writer behind: skip this keyframe, the next one comes 0.4 m later
                 state["last"] = last
                 return
@@ -436,30 +510,47 @@ class MavrosRig:
                 item = q.get()
                 if item is None:
                     return
-                idx, t, m, pose, gt, travel = item
+                idx, t, m, pose, gt, travel, dep = item
                 try:
                     rel = Path("frames") / f"{idx:06d}.png"
                     cv2.imwrite(str(self.run_dir / rel), to_bgr(m))
+                    depth_file = self._save_depth(idx, dep) if dep is not None else None
                     gt_pose = None
                     if gt is not None:
                         gt_pose = camera_from_body(gt[0] + self.world_to_map, gt[1], self.t_base_cam, self.mount_pitch)
                     on_frame(Frame(idx=idx, t=t, image=rel, K=self.K, target=pose, pose=pose, gt_pose=gt_pose,
-                                   travel_m=travel))
+                                   travel_m=travel, depth_file=depth_file))
                 except Exception as e:  # noqa: BLE001 (keep flying; report at the end)
                     state["err"] = e
         wt = threading.Thread(target=writer, daemon=True)
         wt.start()
         sub = self.node.create_subscription(self._Image, f"{self.ns}/zed/zed_node/left/color/rect/image", on_img,
                                             self.sensor_qos)
+        dsub = (self.node.create_subscription(self._Image, f"{self.ns}/{self.rc['depth_topic']}", on_depth, self.sensor_qos)
+                if save_depth else None)
         try:
+            if save_depth:                                    # frame 0 must have its depth too: the first keyframe waits for it
+                self._wait(lambda: bool(recent_d), self.rc["image_timeout_s"], "no depth image", "no_image")
             self._path_tau, self.cmd, self._cmd_t = 0.0, None, None
             self.path = (P, Y, T)
             print(f"[mavros-rig] path: {len(P)} points, {T[-1]:.0f} s at {cruise} m/s", flush=True)
             t_end = self.now() + 3 * T[-1] + 60.0
             img_timeout = float(self.rc["image_timeout_s"])
+            lag_since = None
             while not (self._path_tau >= T[-1] and np.linalg.norm(self.body[0] - P[-1]) < 0.3):
                 self._check_alive()
+                self._check_diverged()
                 now = self.now()
+                cmd = self.cmd                                    # the path clock pauses while the drone lags: a drone that cannot
+                if cmd is not None:                               # follow (crashed, EKF diverged) would be streamed to until t_end
+                    lag = float(np.linalg.norm(self.body[0] - cmd))
+                    if lag > 3 * float(self.rc["max_lead_m"]):
+                        lag_since = now if lag_since is None else lag_since
+                        if now - lag_since > float(self.rc["stall_s"]):
+                            raise RigError("stalled", f"{lag:.1f} m behind the setpoint for {self.rc['stall_s']:.0f} s sim: the drone "
+                                                      "cannot follow (crashed, or EKF2 diverged)")
+                    else:
+                        lag_since = None
                 if now - state["t_img"] > img_timeout:
                     raise RigError("no_image", f"no left image for {img_timeout:.0f} s sim during the path")
                 if now > t_end:
@@ -471,6 +562,8 @@ class MavrosRig:
             self.path = None
             self.cmd = None
             self.node.destroy_subscription(sub)
+            if dsub is not None:
+                self.node.destroy_subscription(dsub)
             q.put(None)
             wt.join(timeout=60)
         if state["err"] is not None:
@@ -493,14 +586,23 @@ class MavrosRig:
                 print("[mavros-rig] landed and disarmed", flush=True)
         except RigError as e:
             print(f"[mavros-rig] finish: {e}", flush=True)
+            if self.started and self._dead is not None and self._rclpy.ok():   # setpoint stream gone: let PX4 land it
+                try:
+                    self.started = False
+                    self._set_mode("AUTO.LAND")
+                except Exception as e2:  # noqa: BLE001 (best effort)
+                    print(f"[mavros-rig] could not request AUTO.LAND: {e2}", flush=True)
         finally:
             self._stop_bag()
             self._stream_on = False
             self.sp = None
-            self.executor.shutdown()
-            self.node.destroy_node()
-            if self._rclpy.ok():
-                self._rclpy.shutdown()
+            try:
+                self.executor.shutdown()
+                self.node.destroy_node()
+                if self._rclpy.ok():
+                    self._rclpy.shutdown()
+            except Exception as e:  # noqa: BLE001 (a dead context fails the teardown; the bag is already closed)
+                print(f"[mavros-rig] teardown: {type(e).__name__}: {e}", flush=True)
 
 
 def to_bgr(msg) -> np.ndarray:

@@ -15,7 +15,15 @@ from kinetix.rig.base import load_rig
 
 def cmd_run(a) -> int:
     scene = load_scene(a.scene)
+    truth = None
+    if a.explore:
+        if a.method != "tour" or scene.kind != "room":
+            raise SystemExit("--explore: a room scene with --method tour (the room is explored, then toured)")
+        a.overrides = list(a.overrides) + ["explore.enabled=true"]
     cfg = load_config(a.config or [], a.overrides, kind=scene.kind)
+    if a.explore:                       # the scene file only scores the fit: planner and rig get a take-off point and a search volume
+        from kinetix.planner.explore import hint_scene
+        truth, scene = scene, hint_scene(scene, cfg["explore"]["volume_m"])
     log = RunLog(a.out, scene.name, a.method, a.rig, a.seed, cfg, uses_gt=False, repo_root=ROOT)
     log.info(f"run {log.run_id}: scene {scene.name} ({scene.kind}), method {a.method}, rig {a.rig}, "
              f"budget {cfg['planner']['budget']}")
@@ -23,14 +31,14 @@ def cmd_run(a) -> int:
     recon = CoverageState.for_scene(scene, Intrinsics(**{k: cam[k] for k in ("width", "height", "fx", "fy", "cx", "cy")}),
                                     cfg["coverage"])
     log.info(f"coverage model: {len(recon.P)} surface points, {len(recon.occluders)} occluders")
-    rig = load_rig(a.rig, cfg, scene, log.dir)
+    rig = load_rig(a.rig, cfg, scene, log.dir, truth)
     try:
-        result = run_session(cfg, scene, rig, recon, a.method, log, a.seed)
+        result = run_session(cfg, scene, rig, recon, a.method, log, a.seed, truth)
     except KeyboardInterrupt:
         result = {"stop_reason": "aborted", "coverage": round(recon.coverage, 4), "seen": round(recon.seen, 4)}
     summary = log.close(result.pop("stop_reason") or "unknown", result)
     print(f"run dir: {log.dir}")
-    return 0 if summary["frames"] > 0 and summary["stop_reason"] != "aborted" else 1
+    return 0 if summary["frames"] > 0 and summary["stop_reason"] not in ("aborted", "stalled") else 1
 
 
 def cmd_sfm(a) -> int:
@@ -50,6 +58,9 @@ def main(argv=None) -> int:
     r.add_argument("--method", default="roi_coverage", choices=METHODS)
     r.add_argument("--rig", default="dry", choices=["dry", "mavros"])
     r.add_argument("--seed", type=int, default=0)
+    r.add_argument("--explore", action="store_true",
+                   help="room + tour: explore the room with the ZED depth first (the scene file's room and obstacles are not used, only "
+                        "its take-off point and altitude band; it scores the fit)")
     r.add_argument("--config", action="append", help="extra config YAML over config/default.yaml (repeatable)")
     r.add_argument("--out", default=str(ROOT / "runs"))
     r.add_argument("overrides", nargs="*", help="key=value, e.g. planner.budget=12")

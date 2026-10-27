@@ -49,10 +49,6 @@ def R_to_quat(R) -> np.ndarray:
     return q / np.linalg.norm(q)
 
 
-def yaw_of_R(R) -> float:
-    return float(np.arctan2(R[1, 0], R[0, 0]))
-
-
 def wrap(a: float) -> float:
     return float((a + np.pi) % (2 * np.pi) - np.pi)
 

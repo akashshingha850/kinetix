@@ -210,6 +210,27 @@ The room box and obstacles come from the scene file, so this is coverage plannin
 METHOD=tour scripts/room_scan.sh all          # bisg sim up -> fly -> kinetix sfm (scripts/room_scan.sh sfm [RUN] re-runs SfM)
 ```
 
+## 5b. Unknown rooms: explore, then tour (ADR-K13)
+
+`--explore` replaces the scene file's room box and obstacles with what the ZED depth shows, then runs `tour` on it, starting from
+what exploration already covered (every exploration view is a keyframe, so the tour plans only the gaps):
+
+```
+rig.capture_at -> depth (32FC1 m) + rig pose (EKF2 ∘ mount)
+   -> OccupancyMap.integrate     (recon/depthmap.py: occupied / free / unknown voxels, 0.2 m)
+   -> fit_scene                  (recon/roomfit.py: walls, floor, ceiling, obstacle boxes -> Scene)
+   -> next_view                  (planner/explore.py: frontier voxels in the view cone, line-of-sight re-score, safe parking + corridor)
+   -> ... until the room is closed or stable -> run_tour on the fitted Scene, the exploration views credited to its coverage
+```
+Exploration views go to `frames.jsonl` (idx 900000+, `pool_id` `explore_<n>`, EKF2 pose) like tour keyframes, so `kinetix sfm` uses
+them. `explore.reuse_views=false` is the traditional baseline for benchmarking (exploration only maps, the tour scans the whole
+room, no exploration frames in `frames.jsonl`): `kinetix run --scene ... --method tour --explore explore.reuse_views=false`; `run.yaml`
+records which arm a run was. Warehouse, dry rig: reuse 16 viewpoints / 73 m, traditional 24 / 100 m (the scene-file tour: 24 / 101 m).
+Outputs in `<run>/explore/`: `scene.yaml` (the fitted room in scene-file format), `occupancy.npz`, `steps.jsonl` (one record per view:
+faces seen, known fraction, frontier, target) and `report.json` (with `vs_truth` when a scene file is given). `steps.jsonl` of the
+run itself still starts with the tour plan. Dry rig: `core/simdepth.py` ray-casts depth against a true scene the planner never
+sees. Config: `explore.*` in `config/default.yaml`. From the GCS: the Kinetix tab's "explore it first" box.
+
 ## 6. Online reconstruction (`recon/state.py`)
 
 `ReconState` wraps a pycolmap database + `Reconstruction` and answers what the scorers need: the

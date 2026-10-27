@@ -156,3 +156,12 @@ def test_dry_tour_covers_the_warehouse_on_a_short_path(tmp_path):
     log = RunLog(tmp_path, scene.name, "tour", "dry", 0, cfg, uses_gt=False)
     res = run_session(cfg, scene, load_rig("dry", cfg, scene, log.dir), recon, "tour", log)
     assert res["stop_reason"] == "tour_done" and res["coverage"] > 0.9 and log.travel_m < 150
+
+
+def test_frame_depth_file_is_recorded():
+    from dataclasses import replace
+    from pathlib import Path
+    f = frame(0, camera_pose(np.array([0.0, 0.0, 1.0]), 0.0))
+    assert f.to_dict()["depth"] is None and f.to_dict()["depth_source"] is None
+    d = replace(f, depth_file=Path("depth/000000.npy")).to_dict()
+    assert d["depth"] == "depth/000000.npy" and d["depth_source"] == "zed"

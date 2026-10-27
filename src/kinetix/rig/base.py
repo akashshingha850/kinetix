@@ -15,11 +15,11 @@ class Rig(Protocol):
     def finish(self) -> None: ...
 
 
-def load_rig(name: str, cfg: dict, scene, run_dir):
+def load_rig(name: str, cfg: dict, scene, run_dir, truth=None):
     """Adapters are imported lazily so T0/unit tests never import rclpy."""
     if name == "dry":
         from kinetix.rig.dry import DryRig
-        return DryRig(cfg, scene, run_dir)
+        return DryRig(cfg, scene, run_dir, truth)
     if name == "mavros":
         from kinetix.rig.mavros import MavrosRig
         return MavrosRig(cfg, scene, run_dir)

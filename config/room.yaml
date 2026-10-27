@@ -38,5 +38,6 @@ planner:
     keyframe_step_deg: 6.0
 
 rig:
+  save_depth: true               # pose + depth per frame for depth-aided photogrammetry (depth/<idx>.npy next to frames/<idx>.png)
   move_timeout_s: 120.0          # sim seconds per move: a 25 m hop at cruise_mps 0.8 plus settling
   cruise_mps: 1.0                # rooms: the top of bisg's validated VIO speeds (vio_bench legs 0.5 and 1 m/s)
