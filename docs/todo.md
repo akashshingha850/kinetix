@@ -137,7 +137,7 @@ How to run it: `METHOD=tour scripts/room_scan.sh all` (sim up, fly, `kinetix sfm
 - [ ] Check asset licences (SimReady, Objaverse++, GSO, OmniObject3D) before fixing the object set
 - [ ] Arrange the real-object scanner for K6 GT (Q4), needed by G3
 - [ ] Set `KINETIX_DATA` in `.env`; move `config/scenes/` there with scene.usd / gt_mesh (`.env` exists, the key does not)
-- [ ] Switch `tool.uv.package = true` (`src/kinetix/` exists)
+- [x] Switch `tool.uv.package = true` (2026-10-28, hatchling backend): `uv run pytest` 59 passed, `uv run python -m kinetix` works
 - [ ] Q3: a bisg change so the sim container can read `$KINETIX_DATA/scenes` (not done: bisg's compose has no such mount)
 - [ ] First object scene: pick the object, build `scene.usd` / `gt_mesh.ply` / `scene.yaml` (the bisg sim has no scan objects now)
 - [ ] `sim/render_server.py` batch mode + `kinetix pool make`

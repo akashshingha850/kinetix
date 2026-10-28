@@ -22,8 +22,12 @@ ml = [
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6"]
 
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [tool.uv]
-package = false              # no package yet (docs/roadmap.md K1 adds src/kinetix)
+package = true               # src/kinetix installed (editable) into the venv
 
 [tool.uv.sources]
 torch = { index = "pytorch-cu128" }
