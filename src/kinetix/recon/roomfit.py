@@ -134,8 +134,10 @@ def fit_scene(omap: OccupancyMap, hint: Scene, fcfg: dict) -> tuple[Scene | None
                 return None, {**report, "closed": False, "faces": {}, "why": f"no extent along axis {ax}"}
         else:               # the floor too, within floor_margin_m: the ZED reads 4-9 % long at 1-6 m, so from 4 m up the floor smears
             n = int(round(fcfg["floor_margin_m"] / v))      # over ~0.3 m and its lowest slice is sparse (run 20261027-182638: 'floor
-            floor0 = e[0]                                   # seen 8 %', fitted 0.23 m low, no tour). Obstacles still start from
-            e = (e[0] + int(np.argmax(counts[e[0]:e[0] + n + 1])), e[1])  # the lowest slice: a low crate keeps its voxels
+            floor0 = e[0]                                   # seen 8 %', fitted 0.23 m low, no tour). Obstacles start from the
+            e = (e[0] + int(np.argmax(counts[e[0]:e[0] + n + 1])), e[1])  # lowest slice (a low crate keeps its voxels), but at
+            floor0 = max(floor0, e[0] - 1)                  # most one below this one: a floor smeared 0.6 m deep put the band on the
+            # real floor, and the floor became one 18 x 25 x 2 m obstacle (flight 20261028-121155; the tour flew above it, coverage 0.71)
         ext[ax] = e
         lo[ax], hi[ax] = (_plane(counts, e[0], +1, omap.lo[ax], v), _plane(counts, e[1], -1, omap.lo[ax], v))
     room = Box((lo + hi) / 2, hi - lo)
@@ -152,12 +154,14 @@ def fit_scene(omap: OccupancyMap, hint: Scene, fcfg: dict) -> tuple[Scene | None
     s1 = [int(np.floor(ext[0][1] - m[0])), int(np.floor(ext[1][1] - m[1])), int(np.floor(ext[2][1] - fcfg["ceiling_margin_m"] / v))]
     if all(a < b for a, b in zip(s0, s1)):
         inner[s0[0]:s1[0], s0[1]:s1[1], s0[2]:s1[2]] = occ[s0[0]:s1[0], s0[1]:s1[1], s0[2]:s1[2]]
-    boxes = []
+    boxes, report["blobs"] = [], []
     for vox in components(inner):
-        if len(vox) < fcfg["min_obstacle_voxels"]:
-            continue
         blo = omap.lo + vox.min(axis=0) * v
         bhi = omap.lo + (vox.max(axis=0) + 1) * v
+        if len(vox) < fcfg["min_obstacle_voxels"]:
+            if len(vox) >= fcfg["min_obstacle_voxels"] // 5:              # too little seen to be an obstacle yet: exploration
+                report["blobs"].append((blo.round(2).tolist(), bhi.round(2).tolist()))   # looks again (explore.face_targets)
+            continue
         if _wall_sheet(blo, bhi, lo, hi, fcfg["wall_artifact_m"]):
             continue
         if blo[2] - lo[2] < fcfg["floor_extend_m"]:                   # stands on the floor: depth never saw under it

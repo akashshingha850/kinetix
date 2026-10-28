@@ -19,8 +19,8 @@ How to run it: `METHOD=tour scripts/room_scan.sh all` (sim up, fly, `kinetix sfm
   completeness proxy 0.35 (0.55 in the full room: the empty room has less texture to triangulate), EKF2 vs GT 0.38 m RMS.
   The default `roi_coverage` (stop-and-shoot) crashed into a wall in the same room on bisg's then GEN_3 VIO (2-4 m drift over a long
   flight; bisg sim ZED is GEN_1 since): use `METHOD=tour` for rooms, `scripts/room_scan.sh` still defaults to `roi_coverage`.
-- [ ] Dense reconstruction (K2 `offline/densify.py`: COLMAP MVS or gsplat) for a real completeness figure; `completeness_proxy`
-  from the sparse cloud is a lower bound (0.55 on the 2026-10-18 tour)
+- Reconstruction (SfM fixes, dense, GT mesh, depth-aided) moved to [todo-reconstruction.md](todo-reconstruction.md) (2026-10-28,
+  [collaboration.md](collaboration.md)); this file is acquisition (explore, planning, flight)
 - [ ] Tour: re-plan online from the keyframes' real coverage (dry 0.91 vs flown 0.79: the drone lags the carrot in turns)
 - [ ] Tour: try cruise 1.5 m/s and size it against motion blur on the real ZED (exposure × speed / GSD)
 - [x] Tour on an unknown room (2026-10-24, dry rig): `--explore` maps the ZED depth at the EKF2 pose, fits the room box + obstacles and tours that (ADR-K13, architecture §5b).
@@ -33,7 +33,7 @@ How to run it: `METHOD=tour scripts/room_scan.sh all` (sim up, fly, `kinetix sfm
   tour flies the gaps (Warehouse dry: 16 viewpoints / 73 m / est. 83 s vs 24 / 101 m / 116 s). Not flown yet.
   Benchmark arms: `explore.reuse_views=true` (default, optimized) vs `false` (traditional: explore maps, the tour scans from scratch;
   dry 24 viewpoints / 90 m, optimized 17 / 80 m since the wall fix below). To do: fly both on the sim and compare total flight time, SfM registration, ATE, completeness
-  Run dirs are named `..._tour-explore-optimized_...` / `..._tour-explore-traditional_...`; the mavros-gcs Kinetix tab has the arm
+  Run dirs are named `..._tour-explore-optimized_...` / `..._tour-explore-traditional_...`; the MRGCS Kinetix tab has the arm
   selector next to *explore it first* (2026-10-27)
 - [x] Room fit: a wall mapped twice (2026-10-27). Flight `20261027-144459`: the east wall also appeared 1.4 m beyond itself (pose drift);
   the fit took that copy, the room came out 0.65-1.7 m too big and the real walls became 2.6-2.8 m thick room-long obstacles (8 boxes).
@@ -63,6 +63,45 @@ How to run it: `METHOD=tour scripts/room_scan.sh all` (sim up, fly, `kinetix sfm
   walls within 0.27 m, 0 obstacles; still no tour: 'floor seen 8 %' (fitted 0.23 m low: the ZED reads 4-9 % long, from 4 m up the floor
   smears) -> roomfit puts the floor on its densest slice within floor_margin_m (refit: 68 %), obstacles still start from the lowest
   slice. With that the same map would still stop on y+ seen 9.2 % (< tour_min_wall 0.10): the camera reached y -4..6.9 of the 30 m hall
+- [x] Explore faster (2026-10-28, `explore.rig`): 1.0 m/s + 30 deg/s (was 0.5 + 20; settle 1 s kept), on bisg's magnetometer yaw +
+  range height. Flight `20261028-103323` (fresh sim) vs `100033` (old pace): explore 367 vs 520 s wall, worst wall 0.19 vs 0.41 m,
+  0 false obstacles both. Pose at the 28 explore views: xy p50/p90/max 0.18/0.40/0.42 vs 0.17/0.39/0.39 m, yaw 0.20/0.54/0.75 vs
+  0.14/0.35/0.38 deg; jitter (EKF - GT minus its 2 s mean) xy 5-6 vs 3 mm, z 6 vs 3 mm, yaw 0.48 vs 0.12 deg std (mostly while
+  turning: the ~70 ms pose/GT stamp offset); slow drift unchanged. Outcome: no tour (y+ seen 10 %, < tour_min_wall), one flight
+  only. z there -0.02 vs +0.10 m: the +0.1 m was bisg's take-off height bias (bisg docs/todo.md, `EKF2_HGT_REF 2`), not speed.
+  bisg back on baro height (`EKF2_HGT_REF 0`), two more flights on one boot (`104849`, `105507`): xy 0.09/0.16/0.23 and
+  0.15/0.29/0.36 m, z p90 0.15 / 0.11 m (no start-up ramp, mid-flight wander), yaw max 0.8 / 1.7 deg; again no tour (y+ seen
+  4 % / 7 %; walls 4.48 / 0.29 m). New pace 0/3 tours vs `100033` 1/1: the 20-view large-room limit below, or the pace; not separated
+- [x] Explore view score knows the room (2026-10-28, ADR-K13 amendment): `explore.face_weight` 25 per m^2 of the fitted room's unseen
+  faces / obstacle sides / small blobs in view (`face_targets`), no closed/stable stop while a blob is pending, and the fit's obstacle
+  band starts at most one slice below the fitted floor (a floor smeared 0.6 m deep became an 18 x 25 m obstacle). nbv_bench (dry):
+  Warehouse 8 starts, weakest wall/floor median 0.20 -> 0.56, gate 6/8 -> 7/8, 100 -> 78 m; small rooms: same obstacles, room12 16.6 -> 8.8 m,
+  partition 18 -> 34 m from one start. Sim, same pace and boot: `121155` weakest wall 0.29 (fit then still made the floor an
+  obstacle), `123651` 0.54 (x- 0.76, x+ 0.69, y- 0.66, floor 0.72), walls 0.37 m, the tour flew both times (0/3 before).
+  Open: legs are 8-12 of the 20 steps on the sim (5-10 before): the targets pull past the known-free corridor (legs could stop
+  counting against `max_steps`, `max_time_s` still bounds it); `123651` tour 89 viewpoints / 162 m, coverage 0.79 (`100033`: 21 / 104 m,
+  0.94): explore views credit 0.22 of coverage (0.32) and the fit has a 13 x 4 m box at z 3.8-8.6 near the y- wall (portal frame or
+  noise? not checked against the USD); tour xy p90 0.93 m over the 14.5 min flight.
+  `kinetix sfm` on `123651`: 642/642 registered, 42.8 k points, reproj 0.75 px, 70 s; ATE vs GT median 0.12 m but RMSE 0.73 / max 17 m from
+  two explore views with 4-5 points each (900012, 900018) that bundle adjustment moved off their EKF2 poses (0.35 m right); without them
+  RMSE 0.16 / median 0.10 / p90 0.23 m (EKF2 0.74 m RMS). Completeness proxy 0.51 (walls 0.44, floor 0.52, ceiling 0.63; the 2026-10-22
+  emptied-room tour 0.35). To do in `sfm.py`: hold cameras with too few points at their prior pose in BA (or drop them)
+  Flight `134802` (MRGCS, same settings): explore ran out its 20 steps (28 views), walls within 0.22 m, ceiling seen 8 %; tour 33 viewpoints /
+  114 m planned, coverage 0.85, 389 keyframes, 784 s in all (`123651`: 642, coverage 0.79). SfM 389/389, 27.6 k points, 0.68 px;
+  tour cameras 0.11 m median / 0.23 max vs GT after Sim3, but RMSE 0.60 / max 9.7 m from three explore views with 2-8 points (900016/25/03,
+  the bug above; without them 0.14 m). EKF2 vs GT 0.57 m RMS, y wandering +0.39..-0.71 m. Findings: (1) the blob gate never clears: 28 of
+  the 33 blobs are roof beams (z >= 7.8) or floor stripes (z <= 0.6) no view resolves, so explore always ends on `max_steps` - blobs need
+  the obstacles' `obstacle_reach_m` filter; (2) the boxes at y -9.3, z 3.3-8.7 (here 3, `123651`'s 13 x 4 m one) are FALSE: frame
+  900024 (y -4, facing the y- wall 8.0 m away) shows nothing in between, its ZED depth reads 7.0-7.4 m on the white brick and 3.8-6.5 m
+  (half invalid) on the plain orange panels; (3) sparse completeness is texture-bound: 0.25 m cells with a point, x walls 0.18/0.23, end
+  walls 0.00/0.03 (plain panels), floor 0.14, ceiling 0.25; 16.5 % of points lie > 0.25 m outside the true room box (median 0.7 m, most
+  beyond x+), not looked into
+  Flight `163032` (same settings): tour 267 keyframes / 195 m, coverage 0.92; SfM 267/267, 22.8 k points, 0.60 px, track 6.4; ATE max
+  20.6 m from explore view 900004 (7 points; the BA bug again), cameras with >= 30 points RMSE 0.15 / median 0.09 m; EKF2 vs GT 0.34 m.
+  Completeness proxy 0.41 (walls 0.33). Acquisition limits: (a) points are far: median depth 12.5 m, 84 % beyond 9 m (2.4 cm/px at
+  fx 530), because the coverage model counts surface up to 12 m (`room.yaml` `depth_range_m`); (b) max triangulation angle per point
+  median 7.5 deg, 34 % below 5 deg; (c) the sim renders no motion blur (Laplacian variance vs speed r = -0.02, 0.6-1.3 m/s), so a sim
+  speed study says nothing about blur
 - [ ] Explore, pose after big turns: capture only once the VIO has settled (spikes of 4-5.5 deg / 0.3-0.6 m for seconds), or slower
   turns while exploring; bisg side: why the ZED/EKF yaw jumps after a turn (map_correction / compass in the zed bridge)
 - [x] Room fit: obstacles must reach within `fit.obstacle_reach_m` (1 m) of the workspace (2026-10-27): roof beams at 8 m dropped
@@ -83,7 +122,9 @@ How to run it: `METHOD=tour scripts/room_scan.sh all` (sim up, fly, `kinetix sfm
 - [x] Sim ZED depth vs range, measured 2026-10-27 (run `20261027-164441`, every 8th pixel of 28 views vs the ray's true distance to the
   room box at the GT camera pose): reads LONG up to 10 m (+9 % at 1-3 m, +4 % at 5-7 m, +2 % at 8 m), short beyond (-5 % at 12-15 m,
   -11 % at 15-16 m). Within explore's 8 m range walls land slightly outward, not inward
-- [ ] Paper scope: C1-C5 are written for objects; decide whether rooms become the target or a second scene class (ADR-K11, ADR-K12)
+- [ ] Paper scope: C1-C5 are written for objects; decide whether rooms become the target or a second scene class (ADR-K11, ADR-K12).
+  Room scoping review 2026-10-28: `research/reports/Room photogrammetry scoping review.md` (closest prior work: ICON drone; open: acquisition
+  geometry vs accuracy under VIO drift, fewest images / shortest flight at a stated accuracy, stereo depth for planning vs reconstruction)
 - [ ] `--rig mavros` start once aborted "MAVROS not connected after 30 s sim" with the topics visible (DDS discovery; retry passed),
   and the process segfaulted (rc 139) on that exit
 

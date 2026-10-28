@@ -2,6 +2,9 @@
 
 Adaptive NBV photogrammetry for indoor objects and whole rooms (ADR-K11/K12) with a monocular drone. Read `docs/architecture.md` first,
 then `docs/todo.md` for the current phase. Update `docs/todo.md` when work is finished.
+Two authors (`docs/collaboration.md`): acquisition (`planner/`, `rig/`, `recon/`, `config/`; todo `docs/todo.md`, branch `acquisition`) and
+reconstruction (`offline/`; todo `docs/todo-reconstruction.md`, branch `reconstruction`). They meet only at the run directory
+(data-format.md §3). Shared paths (`core/`, `recon/align.py`, `cli.py`, data-format/interfaces/publication-plan, deps) change by a separate PR.
 
 - Build phase by phase (`docs/roadmap.md`, K0–K6). Do not start a later phase or widen scope unless asked.
 - Paper claims are C1–C5 in `docs/publication-plan.md` (ADR-K08). Never call the image saving a novelty, and every "first" must survive a novelty sweep.

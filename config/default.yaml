@@ -58,8 +58,9 @@ explore:                         # exploration pass for an unknown room (planner
     tol_yaw_deg: 10.0
     tol_speed_mps: 0.3
     settle_s: 1.0                # slow (2026-10-27, Warehouse, one flight each): 1 m/s + 60 deg/s turns + 0.2 s gave 5 false obstacles
-    cruise_mps: 0.5              # and no tour (pose 0.59 m off after a turn); 0.5 m/s + 20 deg/s + 1 s gave 0 and a tour. Yaw spikes of
-    yaw_rate_deg_s: 20.0         # 4-7 deg after a turn stayed either way (bisg side). Slower = longer: 28 views took 238 of max_time_s 240
+    cruise_mps: 1.0              # and no tour (pose 0.59 m off after a turn); 0.5 m/s + 20 deg/s + 1 s gave 0 and a tour. Yaw spikes of
+    yaw_rate_deg_s: 30.0         # 4-7 deg after a turn stayed either way (bisg side). Slower = longer: 28 views took 238 of max_time_s 240.
+                                 # 2026-10-28: 1 m/s + 30 deg/s (was 0.5 m/s, 20 deg/s) on bisg's magnetometer yaw + range height (docs/todo.md)
   min_views: 6                   # never stop as closed before this many views
   stable_steps: 4                # ... or stop when the fitted room and obstacle count stayed put for this many steps
   stable_tol_m: 0.3              # (a wall moves less than this between fits)
@@ -68,6 +69,10 @@ explore:                         # exploration pass for an unknown room (planner
   range_frontier_weight: 1.0     # the edge of air carved by returns from beyond depth_range_m is frontier too, at this weight:
                                  # without it nothing leads to a wall farther than the range (Warehouse: far walls 2-9 % seen)
   min_frontier_gain: 20          # a view must see at least this many frontier voxels
+  face_weight: 25.0              # + this per m^2 of what the fitted room still lacks in view (explore.face_targets: the unseen part of
+                                 # each face below fit.closed_target, the unseen sides of obstacles and small blobs). 0 = frontier only.
+                                 # nbv_bench, 2026-10-28: Warehouse 8 starts, weakest wall/floor median 0.20 -> 0.56, tour gate 6/8 -> 7/8,
+                                 # 100 -> 78 m; the small rooms find the same obstacles. 50 overshoots (partition room 28 views / 61 m)
   clearance_m: 0.8               # the drone parks only where this far from occupied and unknown space (horizontal) ...
   clearance_z_m: 0.4             # ... and this far vertically. Both are raised to planner.clearance_m: the tour starts where exploration ends
   cand_step_m: 1.0               # candidate viewpoints on a 1 m grid of safe voxels

@@ -23,7 +23,7 @@ from kinetix.core.geometry import camera_pose, camera_yaw, wrap
 from kinetix.core.types import Box, Intrinsics, Pose, RigError, Scene
 from kinetix.recon.depthmap import OccupancyMap
 from kinetix.recon.register import DriftTracker
-from kinetix.recon.roomfit import compare, fit_scene, scene_to_dict, translated
+from kinetix.recon.roomfit import AXIS_FACE, compare, fit_scene, scene_to_dict, translated
 
 IDX0 = 900000                       # exploration images are numbered apart from the tour's keyframes (frames/NNNNNN.png)
 
@@ -140,11 +140,58 @@ class Reach:
         return pts[np.argmax(ok)] if ok.any() else None
 
 
+def _side_targets(omap: OccupancyMap, i0, i1, ax: int, start: int, step: int, n: int, stride: int) -> np.ndarray:
+    """March every `stride`-th cell of the box face (i0..i1 across axis `ax`) from voxel `start` along `ax` in `step`s, up to n
+    voxels: the first voxel that is not free, where it is unknown (an occupied one is the surface, seen)."""
+    idx = start + step * np.arange(n)
+    idx = idx[(idx >= 0) & (idx < omap.shape[ax])]
+    if not len(idx):
+        return np.zeros((0, 3))
+    sl = [slice(i0[k], i1[k] + 1, stride) for k in range(3)]
+    sl[ax] = slice(None)
+    col = np.moveaxis(np.take(omap.L[tuple(sl)], idx, axis=ax), ax, -1)       # (cells, cells, along the march)
+    k = np.argmax(col >= 0, axis=-1)                                           # first voxel that is not free
+    first = np.take_along_axis(col, k[..., None], -1)[..., 0]
+    cells = np.argwhere(first == 0)                                            # unknown (an all-free column gives a free 'first')
+    ijk = np.insert(np.asarray(i0)[[o for o in range(3) if o != ax]] + cells * stride, ax, idx[k[tuple(cells.T)]], axis=1)
+    return omap.lo + (ijk + 0.5) * omap.voxel
+
+
+def face_targets(omap: OccupancyMap, rep: dict, scene: Scene | None, target: float, stride: int = 2) -> tuple[np.ndarray, float]:
+    """What the fitted room still lacks, as points to look at -> (points, m^2 of surface per point).
+    Walls: for every `stride`-th cell of each face seen less than `target`, the first voxel from just inside its plane outward that
+    is not free, when it is unknown. Before any wall is seen the fit puts the face where the seen floor ends; once rays carve past
+    that plane the target moves out with the carved air, so it keeps pointing at the wall the fit lacks. Frontier gain alone
+    favours the nearest unknown air (Warehouse flights 2026-10-28: 6.7 m from the far end wall the best view looked sideways; that
+    wall ended 4-10 % seen and no tour was flown).
+    Obstacles: the same from just outside each side and the top of every fitted box (and of every blob still too small to be one,
+    report["blobs"]) inward, so its unseen back is a target too. Without it the walls close first and a crate seen from one side
+    is fitted as a thin slab, or not at all (nbv_bench rooms)."""
+    if not rep.get("roi_lo"):
+        return np.zeros((0, 3)), 0.0
+    shape = np.array(omap.shape)
+    idx = lambda p: np.clip(((np.asarray(p) - omap.lo) / omap.voxel).astype(int), 0, shape - 1)   # noqa: E731
+    i0, i1 = idx(rep["roi_lo"]), idx(rep["roi_hi"])
+    out = []
+    for ax in range(3):
+        for side, name, sgn in ((i0[ax], AXIS_FACE[ax][0], -1), (i1[ax], AXIS_FACE[ax][1], 1)):
+            if rep["faces"].get(name, 1.0) < target:                            # one voxel inside the plane, then outward
+                out.append(_side_targets(omap, i0, i1, ax, side - sgn, sgn, int(shape[ax]), stride))
+    boxes = [(b.center - b.size / 2, b.center + b.size / 2) for b in (scene.no_fly if scene is not None else ())]
+    for lo, hi in boxes + [tuple(map(np.asarray, bl)) for bl in rep.get("blobs", ())]:
+        b0, b1 = idx(lo), idx(hi)
+        for ax, sgn in ((0, -1), (0, 1), (1, -1), (1, 1), (2, 1)):           # not the bottom: it stands on the floor
+            side = b1[ax] if sgn > 0 else b0[ax]                                # one voxel outside the face, then inward
+            out.append(_side_targets(omap, b0, b1, ax, side + sgn, -sgn, int(b1[ax] - b0[ax]) + 3, stride))
+    return (np.vstack(out) if out else np.zeros((0, 3))), (stride * omap.voxel) ** 2
+
+
 def view_candidates(omap: OccupancyMap, frontier_pts: np.ndarray, current, hint: Scene, K: Intrinsics, ec: dict, mount_pitch: float,
-                    blocked: list, rng: np.random.Generator, tried: list = ()):
-    """The reachable viewpoints and their view-cone score: (scored, pos, L, F, scale, y0, reach) or None. `scored` holds
-    (utility, position index, yaw, rotation) of every view that sees at least `min_frontier_gain` frontier voxels in its cone; L is
-    the flight distance to each position through the corridor, `reach` the Reach that measured it."""
+                    blocked: list, rng: np.random.Generator, tried: list = (), targets=None):
+    """The reachable viewpoints and their view-cone score: (scored, pos, L, F, scale, y0, reach, T, t_w) or None. `scored` holds
+    (utility, position index, yaw, rotation) of every view that sees at least `min_frontier_gain` frontier voxels in its cone, or
+    face area worth as much; L is the flight distance to each position through the corridor, `reach` the Reach that measured
+    it. `targets` = face_targets(): T, and t_w = the utility of one target point (explore.face_weight per m^2)."""
     from kinetix.core.geometry import quat_to_R
     v = omap.voxel
     zc = omap.lo[2] + (np.arange(omap.shape[2]) + 0.5) * v
@@ -180,6 +227,11 @@ def view_candidates(omap: OccupancyMap, frontier_pts: np.ndarray, current, hint:
     if len(F) > ec["max_frontier_pts"]:
         scale = len(F) / ec["max_frontier_pts"]
         F = F[rng.choice(len(F), ec["max_frontier_pts"], replace=False)]
+    T, t_w = targets if targets is not None and ec["face_weight"] > 0 else (np.zeros((0, 3)), 0.0)
+    t_w *= ec["face_weight"]
+    if len(T) > ec["max_frontier_pts"]:
+        t_w *= len(T) / ec["max_frontier_pts"]
+        T = T[rng.choice(len(T), ec["max_frontier_pts"], replace=False)]
     y0 = camera_yaw(current)
     near_tried = [np.linalg.norm(pos - tp, axis=1) < 0.5 for tp, _ in tried]
     scored = []                                                        # (utility, position index, yaw, rotation)
@@ -194,21 +246,24 @@ def view_candidates(omap: OccupancyMap, frontier_pts: np.ndarray, current, hint:
             if done[i]:
                 continue
             gain = in_frustum(F, p, R, K, *ec["depth_range_m"]).sum() * scale
+            if len(T):
+                gain += in_frustum(T, p, R, K, *ec["depth_range_m"]).sum() * t_w
             if gain >= ec["min_frontier_gain"]:
                 scored.append((gain - ec["travel_weight"] * L[i] - ec["yaw_weight"] * abs(wrap(yaw - y0)), i, yaw, R))
-    return scored, pos, L, F, scale, y0, reach
+    return scored, pos, L, F, scale, y0, reach, T, t_w
 
 
 def next_view(omap: OccupancyMap, frontier_pts: np.ndarray, current, hint: Scene, K: Intrinsics, ec: dict, mount_pitch: float,
-              blocked: list, rng: np.random.Generator, tried: list = ()):
-    """(pose, visible frontier voxels) of the best reachable viewpoint, or None. Every candidate is scored on the view cone alone
-    (cheap); the best few are re-scored with a line-of-sight test, so a view that stares at a crate does not win on the
-    frontier behind it. `tried` = (position, yaw) of earlier views: none is chosen twice. A view the drone cannot fly to in one
-    straight segment returns the first leg of the way there instead (facing along it, gain 0): it replans from there."""
-    c = view_candidates(omap, frontier_pts, current, hint, K, ec, mount_pitch, blocked, rng, tried)
+              blocked: list, rng: np.random.Generator, tried: list = (), targets=None):
+    """(pose, gain) of the best reachable viewpoint, or None. Every candidate is scored on the view cone alone (cheap); the best
+    few are re-scored with a line-of-sight test, so a view that stares at a crate does not win on the frontier behind it.
+    `tried` = (position, yaw) of earlier views: none is chosen twice. A view the drone cannot fly to in one straight segment
+    returns the first leg of the way there instead (facing along it, gain 0): it replans from there. gain = visible frontier
+    voxels + the worth of the visible face targets (`targets`, see view_candidates)."""
+    c = view_candidates(omap, frontier_pts, current, hint, K, ec, mount_pitch, blocked, rng, tried, targets)
     if c is None:
         return None
-    scored, pos, L, F, scale, y0, reach = c
+    scored, pos, L, F, scale, y0, reach, T, t_w = c
     cur = np.asarray(current.p, dtype=float)
     order = sorted(scored, key=lambda s: -s[0])
     n = ec["los_top"]
@@ -220,6 +275,9 @@ def next_view(omap: OccupancyMap, frontier_pts: np.ndarray, current, hint: Scene
             p = pos[i]
             vis = in_frustum(F, p, R, K, *ec["depth_range_m"])
             gain = los_clear(omap, p, F[vis]).sum() * scale
+            if len(T):
+                tv = in_frustum(T, p, R, K, *ec["depth_range_m"])
+                gain += los_clear(omap, p, T[tv]).sum() * t_w if tv.any() else 0.0
             if gain >= ec["min_frontier_gain"]:
                 ranked.append((gain - ec["travel_weight"] * L[i] - ec["yaw_weight"] * abs(wrap(yaw - y0)), p, yaw, gain))
         for _, p, yaw, gain in sorted(ranked, key=lambda r: -r[0]):
@@ -309,7 +367,8 @@ def run_explore(cfg: dict, hint: Scene, rig, log, truth: Scene | None = None,
                     h[2] == last[0][2] and max(np.abs(h[0] - last[0][0]).max(), np.abs(h[1] - last[0][1]).max()) <= ec["stable_tol_m"]
                     for h in last) and min(rep["faces"].values()) >= ec["min_face"]
                     and all(o <= fc["max_opening_voxels"] for o in rep["openings"].values()))   # a partition stays put too
-            if scene is not None and (rep["closed"] or stable) and n >= ec["min_views"]:
+            # a blob too small to be an obstacle yet is looked at again first (face_targets), not left out of the room
+            if scene is not None and (rep["closed"] or stable) and n >= ec["min_views"] and not rep.get("blobs"):
                 stop = "closed" if rep["closed"] else "stable"
                 steps.write(json.dumps(rec) + "\n")
                 break
@@ -327,7 +386,8 @@ def run_explore(cfg: dict, hint: Scene, rig, log, truth: Scene | None = None,
                 stop = "no_frontier"
                 steps.write(json.dumps(rec) + "\n")
                 break
-            pick = next_view(omap, F, to_map(rig.pose()), hint, K, ec, pitch, blocked, rng, tried)
+            targets = face_targets(omap, rep, scene, fc["closed_target"]) if scene is not None else None
+            pick = next_view(omap, F, to_map(rig.pose()), hint, K, ec, pitch, blocked, rng, tried, targets)
             if pick is None:
                 stop = "no_reachable_view"
                 steps.write(json.dumps(rec) + "\n")

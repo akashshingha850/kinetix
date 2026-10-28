@@ -111,11 +111,11 @@ def spearman(a, b):
 # --- strategies: drop-in replacements of explore.next_view --------------------------------------------------------------
 def _cands(args, n_top=24, n_rand=16, rng=None):
     """The candidates the NBV scored on the cone, best n_top plus n_rand others, each with its line-of-sight gain and utility."""
-    omap, F0, current, hint, K, ec, pitch, blocked, rng0, tried = args
-    c = X.view_candidates(omap, F0, current, hint, K, ec, pitch, blocked, rng0, tried)
+    omap, F0, current, hint, K, ec, pitch, blocked, rng0, tried = args[:10]
+    c = X.view_candidates(*args)
     if c is None or not c[0]:
         return None
-    scored, pos, L, F, scale, y0, _ = c
+    scored, pos, L, F, scale, y0 = c[:6]
     order = sorted(range(len(scored)), key=lambda k: -scored[k][0])
     pick = order[:n_top]
     rest = order[n_top:]
@@ -248,6 +248,8 @@ def explore_once(scene, vol, start, strategy="nbv", ec=None, analyse=False, seed
             "frontier_views": len(sent) - cfg["explore"]["sweep_yaws"], "legs": int(sum(legs)), "path_m": round(float(sum(np.linalg.norm(np.diff(p, axis=0), axis=1))), 1),
             "turn_deg": round(float(np.degrees(sum(abs(wrap(b - a)) for a, b in zip(yaw, yaw[1:]))))),
             "flight_s": rep.get("flight_s"), "fitted": scene_fit is not None, "min_face": round(min(rep.get("faces", {0: 0}).values()), 2),
+            "min_wall": round(min([v for k, v in rep.get("faces", {}).items() if k != "ceiling"] or [0]), 2),   # the tour's gate
+            "faces": rep.get("faces"), "targets": [[round(float(x), 1) for x in s.p] for s in sent],
             "known": round(rep.get("known_fraction", 0.0), 3), "wall_err_m": vs.get("roi_max_err_m"),
             "obst": f"{vs.get('obstacles_found', '-')}/{vs.get('obstacles_true', '-')} ({vs.get('obstacles_fitted', '-')} fitted)",
             "plan_ms_mean": round(1e3 * float(np.mean(plan_s)), 1) if plan_s else None,

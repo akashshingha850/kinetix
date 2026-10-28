@@ -268,6 +268,24 @@ def test_face_openings_count_free_space_past_a_face():
     assert o["x+"] == 27 and o["x-"] == 0
 
 
+def test_face_targets_follow_the_carved_air_to_the_wall_and_the_unseen_back_of_a_crate():
+    from kinetix.planner.explore import face_targets
+    omap = OccupancyMap([0, 0, 0], [4, 2, 2], 0.2)                                  # 20 x 10 x 10 voxels, all unknown
+    omap.L[:15] = -1                                                                # air carved to x = 3.0, past the x+ plane at 2.0
+    omap.L[12, 4] = 3                                                               # ... except one row, where the wall was hit
+    rep = {"roi_lo": [0.5, 0.5, 0.5], "roi_hi": [2.0, 1.5, 1.5], "faces": {"x-": 1, "x+": 0.1, "y-": 1, "y+": 1, "floor": 1, "ceiling": 1}}
+    T, area = face_targets(omap, rep, None, 0.6)
+    assert len(T) and np.allclose(T[:, 0], 3.1) and area == (2 * 0.2) ** 2         # the first unknown voxel past the carved air
+    assert not np.isclose(T[:, 1], 0.9).any()                                       # the row that hit the wall is resolved
+    rep["faces"]["x+"] = 0.9
+    assert len(face_targets(omap, rep, None, 0.6)[0]) == 0                          # every face seen: nothing left to pull
+    crate = Scene("c", ROOM, ROOM, (Box(np.array([1.0, 1.0, 0.4]), np.array([0.4, 0.4, 0.4])),), (0, np.inf), (1, 3), kind="room")
+    omap.L[6:8, 4:6, 1:3] = 0                                                       # its inside and back: never seen
+    omap.L[4, 4:6, 1:3] = 3                                                         # its front face (x-) was seen
+    T, _ = face_targets(omap, rep, crate, 0.6)
+    assert len(T) and (T[:, 0] > 1.2).all()                                         # the back, not the seen front
+
+
 def test_the_tour_is_not_flown_on_a_room_exploration_did_not_fit(tmp_path):
     """Live sim, second run: a 28-view exploration left the walls at 2-8 % seen and 15 false obstacles; the tour then flew on that and
     the EKF diverged. A tour needs every wall (and the floor) seen at least `explore.tour_min_wall`."""

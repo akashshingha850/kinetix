@@ -220,7 +220,8 @@ what exploration already covered (every exploration view is a keyframe, so the t
 rig.capture_at -> depth (32FC1 m) + rig pose (EKF2 ∘ mount)
    -> OccupancyMap.integrate     (recon/depthmap.py: occupied / free / unknown voxels, 0.2 m)
    -> fit_scene                  (recon/roomfit.py: walls, floor, ceiling, obstacle boxes -> Scene)
-   -> next_view                  (planner/explore.py: frontier voxels in the view cone, line-of-sight re-score, safe parking + corridor)
+   -> next_view                  (planner/explore.py: frontier voxels + the fitted room's unseen faces / obstacle sides (face_targets)
+                                  in the view cone, line-of-sight re-score, safe parking + corridor)
    -> ... until the room is closed or stable -> run_tour on the fitted Scene, the exploration views credited to its coverage
 ```
 Exploration views go to `frames.jsonl` (idx 900000+, `pool_id` `explore_<n>`, EKF2 pose) like tour keyframes, so `kinetix sfm` uses

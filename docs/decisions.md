@@ -247,3 +247,22 @@ Kinetix code, `--explore` in the Warehouse, two flights each: EKF2 max 0.62-0.98
 0.64-0.76) before, worst fitted wall 0.66-1.04 m against 2.41-4.11 m. Still no tour: every run stopped at the 20-view budget with a
 face seen < 10 % (the large-room limit above), and the walls stay ~1 m off with EKF2 at 0.2-0.5 m, which points at the sim ZED's
 depth at range (reads ~10 % short at 8-15 m, open above) rather than the pose.
+**Room targets in the view score (2026-10-28).** Five Warehouse flights (0.5 and 1 m/s) all ended at the 20-view budget with an end
+wall 4-14 % seen; 5-10 of the 20 steps were legs. At 6.7 m from the far end wall the best view looked sideways: frontier voxels are
+edges of carved air and are everywhere, nothing in the score knows the faces the fit needs. Now a view also earns `explore.face_weight`
+(25 frontier voxels) per m^2 of what the fitted room still lacks in its cone (`face_targets`): per cell of each face below
+`fit.closed_target`, the first not-free voxel from just inside the plane outward when it is unknown (the face of an unseen wall sits
+where the seen floor ends, and its target moves out with the carved air, so it keeps pointing at the wall); the same inward from just
+outside every fitted obstacle box and every blob still too small to be one (`fit` report `blobs`), so a crate's unseen back is a
+target too; and exploration does not stop as closed / stable while a blob is pending. A first version took only the plane cells: the
+face stuck on carved air 2-6 m short of the wall; walls only, without the obstacle part, found 1/2 crates in two small-room runs.
+nbv_bench (dry rig) against `face_weight 0`: Warehouse from 8 take-off points (y -1..7, both end walls inside the 40 m map), weakest
+wall/floor median 0.20 -> 0.56, tour gate 6/8 -> 7/8, 100 -> 78 m, 128 -> 106 s, legs 41 -> 26, half the runs stop `stable` before the
+budget; small rooms: the same obstacles found everywhere, walls the same or better, room12 16.6 -> 8.8 m, the partition room 18 -> 34 m
+from one start and 26 -> 17 m from the other. 50 overshoots (partition 28 views / 61 m), 10-15 are no better than 0 in the Warehouse.
+Still no closed Warehouse: the far end wall from an off-centre start can stay < 10 % (1/8).
+First sim flight with it (`20261028-121155`): weakest wall/floor 0.29 (0.04-0.10 on the three flights before at the same pace), walls
+within 0.16 m, the tour flew; but 12 of 20 steps were legs (the targets pull past the known-free corridor) and the fit made the floor
+an 18 x 25 x 2 m obstacle: the sim ZED's floor smeared 0.6 m deep and the obstacle band, `floor_margin_m` above the lowest floor slice,
+sat on the real floor (the tour then flew above 2.9 m: 120 viewpoints, coverage 0.71). The band now starts at most one slice below
+the fitted floor: the dry rooms keep their low crates, the floor boxes of all five Warehouse flight maps are gone on a refit.
