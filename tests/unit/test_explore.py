@@ -281,3 +281,38 @@ def test_the_tour_is_not_flown_on_a_room_exploration_did_not_fit(tmp_path):
     assert res["stop_reason"] == "explore_incomplete", res
     frames = (log.dir / "frames.jsonl").read_text().splitlines()
     assert frames and all(json.loads(f)["pool_id"].startswith("explore_") for f in frames)      # only exploration views, no tour keyframes
+
+
+def test_cli_traditional_arm_names_the_run_and_reuses_no_views(tmp_path):
+    """The benchmark arm reaches the run: `explore.reuse_views=false` = a traditional run dir, no exploration keyframes."""
+    from kinetix.cli import main
+    main(["run", "--scene", str(ROOT / "config" / "scenes" / "warehouse_room.yaml"), "--method", "tour", "--explore",
+          "--out", str(tmp_path), "explore.reuse_views=false"])
+    (run,) = tmp_path.iterdir()
+    assert run.name.endswith("_warehouse_room_tour-explore-traditional_dry_s0"), run.name
+    assert not any(str(json.loads(f)["pool_id"]).startswith("explore_") for f in (run / "frames.jsonl").read_text().splitlines())
+
+
+def test_fit_puts_the_wall_on_its_dense_sheet_not_on_a_drifted_copy_beyond_it():
+    """Flown 2026-10-27: the east wall mapped a second time 1.4 m out (pose drift); fitting the room to that copy left the real
+    wall inside the room as a 2.8 m thick, room-long obstacle."""
+    cfg = load_config([], [], kind="room")
+    omap = OccupancyMap([-8, -8, -1], [8, 8, 9], 0.2)
+    c = lambda x: int(round((x - omap.lo[0]) / 0.2))                 # noqa: E731 -- voxel index of a coordinate (all axes start at -8/-1)
+    zc = lambda z: int(round((z - omap.lo[2]) / 0.2))                # noqa: E731
+    L = omap.L
+    L[c(-5):c(5), c(-4):c(4), zc(0)] = 5                            # floor, ceiling
+    L[c(-5):c(5), c(-4):c(4), zc(8.0)] = 5
+    for x in (-5, 5):
+        L[c(x), c(-4):c(4), zc(0):zc(8.0)] = 5                       # walls
+    for y in (-4, 4):
+        L[c(-5):c(5), c(y), zc(0):zc(8.0)] = 5
+    L[c(6.4), c(-4):c(4):3, zc(0):zc(8.0):2] = 5                      # the weaker copy of the east wall, 1.4 m out
+    L[c(-5):c(5):2, c(-4):c(4), zc(-0.4)] = 5                        # a sparser floor layer 0.4 m under it (depth reading long)
+    L[c(-3):c(3), c(1), zc(6.6)] = 5                                  # a roof beam, above the flight volume: not an obstacle
+    L[c(0):c(0.4), c(-2):c(-1.6), zc(0):zc(8.0)] = 5                  # a post in the room: one
+    scene, rep = fit_scene(omap, hint_scene(TRUTH, [16, 16, 7]), cfg["explore"]["fit"])
+    assert scene is not None, rep
+    assert abs(scene.roi.hi[0] - 5.0) <= 0.2, scene.roi
+    assert abs(scene.roi.lo[2] - 0.0) <= 0.2 and rep["faces"]["floor"] > 0.5, (scene.roi, rep["faces"])
+    assert len(scene.no_fly) == 1 and abs(scene.no_fly[0].center[0] - 0.2) < 0.3, scene.no_fly

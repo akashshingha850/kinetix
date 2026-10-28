@@ -118,13 +118,25 @@ def fit_scene(omap: OccupancyMap, hint: Scene, fcfg: dict) -> tuple[Scene | None
     occ = omap.occupied
     v = omap.voxel
     report = {"occupied_voxels": int(occ.sum()), "known_fraction": float((omap.L != 0).mean())}
-    ext, lo, hi = [], np.zeros(3), np.zeros(3)
-    for ax in range(3):
-        counts = occ.sum(axis=tuple(k for k in range(3) if k != ax))
+    ext, lo, hi = [None] * 3, np.zeros(3), np.zeros(3)
+    for ax in (2, 0, 1):    # floor and ceiling first: a wall is what stands between them (the floor fills every x/y slice)
+        src = occ if ax == 2 else occ[:, :, ext[2][0] + int(np.ceil(fcfg["floor_margin_m"] / v)) + 1:
+                                         ext[2][1] - int(np.ceil(fcfg["ceiling_margin_m"] / v))]
+        counts = src.sum(axis=tuple(k for k in range(3) if k != ax))
         e = _extent(counts, fcfg["slab_frac"], fcfg["slab_min_voxels"])
         if e is None or e[1] <= e[0]:
             return None, {**report, "closed": False, "faces": {}, "why": f"no extent along axis {ax}"}
-        ext.append(e)
+        if ax < 2:          # a wall is the densest slice within wall_artifact_m inward of the outermost one: a weaker sheet beyond
+            n = int(round(fcfg["wall_artifact_m"] / v))     # it is that wall seen again after pose drift (fitting to it left the
+            e = (e[0] + int(np.argmax(counts[e[0]:e[0] + n + 1])),        # real wall inside the room as a wall-sized obstacle)
+                 e[1] - int(np.argmax(counts[max(e[1] - n, 0):e[1] + 1][::-1])))
+            if e[1] <= e[0]:
+                return None, {**report, "closed": False, "faces": {}, "why": f"no extent along axis {ax}"}
+        else:               # the floor too, within floor_margin_m: the ZED reads 4-9 % long at 1-6 m, so from 4 m up the floor smears
+            n = int(round(fcfg["floor_margin_m"] / v))      # over ~0.3 m and its lowest slice is sparse (run 20261027-182638: 'floor
+            floor0 = e[0]                                   # seen 8 %', fitted 0.23 m low, no tour). Obstacles still start from
+            e = (e[0] + int(np.argmax(counts[e[0]:e[0] + n + 1])), e[1])  # the lowest slice: a low crate keeps its voxels
+        ext[ax] = e
         lo[ax], hi[ax] = (_plane(counts, e[0], +1, omap.lo[ax], v), _plane(counts, e[1], -1, omap.lo[ax], v))
     room = Box((lo + hi) / 2, hi - lo)
     faces = face_coverage(occ, tuple(ext))
@@ -136,7 +148,7 @@ def fit_scene(omap: OccupancyMap, hint: Scene, fcfg: dict) -> tuple[Scene | None
     # obstacles: occupied voxels inside the room, clear of its faces
     m = np.array([fcfg["wall_margin_m"], fcfg["wall_margin_m"], 0.0]) / v
     inner = np.zeros(occ.shape, dtype=bool)
-    s0 = [int(np.ceil(ext[0][0] + m[0] + 1)), int(np.ceil(ext[1][0] + m[1] + 1)), int(np.ceil(ext[2][0] + fcfg["floor_margin_m"] / v + 1))]
+    s0 = [int(np.ceil(ext[0][0] + m[0] + 1)), int(np.ceil(ext[1][0] + m[1] + 1)), int(np.ceil(floor0 + fcfg["floor_margin_m"] / v + 1))]
     s1 = [int(np.floor(ext[0][1] - m[0])), int(np.floor(ext[1][1] - m[1])), int(np.floor(ext[2][1] - fcfg["ceiling_margin_m"] / v))]
     if all(a < b for a, b in zip(s0, s1)):
         inner[s0[0]:s1[0], s0[1]:s1[1], s0[2]:s1[2]] = occ[s0[0]:s1[0], s0[1]:s1[1], s0[2]:s1[2]]
@@ -151,8 +163,6 @@ def fit_scene(omap: OccupancyMap, hint: Scene, fcfg: dict) -> tuple[Scene | None
         if blo[2] - lo[2] < fcfg["floor_extend_m"]:                   # stands on the floor: depth never saw under it
             blo[2] = lo[2]
         boxes.append(Box((blo + bhi) / 2, bhi - blo))
-    report["n_obstacles"] = len(boxes)
-
     # workspace + altitude: the room shrunk by the flight margins
     wm = fcfg["workspace_margin_m"]
     wlo, whi = lo.copy(), hi.copy()
@@ -164,6 +174,10 @@ def fit_scene(omap: OccupancyMap, hint: Scene, fcfg: dict) -> tuple[Scene | None
     if zhi <= zlo:
         return None, {**report, "closed": False, "why": "room too low for the altitude band"}
     wlo[2], whi[2] = zlo, zhi
+    # only what the drone can reach is an obstacle: roof beams above the workspace are not (Warehouse 2026-10-27, z 8-9 m)
+    near = fcfg["obstacle_reach_m"]
+    boxes = [b for b in boxes if np.all(b.lo < whi + near) and np.all(b.hi > wlo - near)]
+    report["n_obstacles"] = len(boxes)
     scene = replace(hint, name=f"{hint.name}_explored", roi=room, workspace=Box((wlo + whi) / 2, whi - wlo), no_fly=tuple(boxes),
                     standoff=(0.0, float("inf")), altitude=(float(zlo), float(zhi)), gt_mesh=None, kind="room")
     return scene, report

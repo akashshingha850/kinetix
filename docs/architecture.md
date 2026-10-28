@@ -104,7 +104,7 @@ becomes a real pool.
 ## 4. Module map
 
 Target layout (created incrementally per [roadmap.md](roadmap.md); built so far: `core/`, `rig/` dry + mavros, `recon/coverage.py` +
-`align.py`, `planner/` loop/sampler/constraints/select/stop/tour + scorers random/roi_coverage, `offline/sfm.py`, `cli.py`):
+`align.py`, `planner/` loop/nbv/tour/explore/sampler/constraints + scorers random/roi_coverage, `offline/sfm.py`, `cli.py`):
 
 ```
 src/kinetix/
@@ -120,13 +120,14 @@ src/kinetix/
                align.py       Sim3 / Umeyama, ATE
                depth/         DepthSource per frame: mono.py (DA-V2 anchored to SfM; `anchor: sfm | stereo | none`, `model: da_v2 | metric3d | depth_pro`)
                               stereo_learned.py (FoundationStereo | SGBM) · stereo_zed.py (T2/T3 topic, or the pool's `zed/` depth on T0/T1) · gt.py
-  planner/     loop.py        the session loop (§5) — the only orchestrator
+  planner/     loop.py        the session entry point (§5): `run_session` picks the method's loop
+               nbv.py         stepwise NBV loop (roi_coverage, random, orbit): select (argmax of gain − λ·travel cost),
+                              stop rule (budget / coverage / gain plateau), orbit order
+               explore.py     unknown room: occupancy map from ZED depth, frontier views, room fit (§5b)
                seed.py        initial views (e.g. 4-6 views on a ring around the ROI)
                sampler.py     candidate poses (pool lookup | view sphere | ring stack | Tammes sphere | room grid)
-               tour.py        rooms: set cover, TSP order, dense path (method `tour`, §5a)
+               tour.py        rooms: set cover, TSP order, dense path and the tour loop `run_tour` (method `tour`, §5a)
                constraints.py workspace box, no-fly boxes, standoff, altitude, straight-line path check
-               select.py      argmax of gain − λ·travel cost
-               stop.py        budget / time / gain plateau
                sequence.py    fixed-sequence planners: orbit, grid (baselines)
                scorers/       random · fvs · volumetric_ig · coverage_oracle · sfm_uncertainty · depth_frontier · combo
                external/      wrappers for third-party pool baselines: fisherrf.py, ma_scvp.py (their code runs in
@@ -225,7 +226,10 @@ rig.capture_at -> depth (32FC1 m) + rig pose (EKF2 ∘ mount)
 Exploration views go to `frames.jsonl` (idx 900000+, `pool_id` `explore_<n>`, EKF2 pose) like tour keyframes, so `kinetix sfm` uses
 them. `explore.reuse_views=false` is the traditional baseline for benchmarking (exploration only maps, the tour scans the whole
 room, no exploration frames in `frames.jsonl`): `kinetix run --scene ... --method tour --explore explore.reuse_views=false`; `run.yaml`
-records which arm a run was. Warehouse, dry rig: reuse 16 viewpoints / 73 m, traditional 24 / 100 m (the scene-file tour: 24 / 101 m).
+records which arm a run was; the run dir is named `..._tour-explore-optimized_...` / `..._tour-explore-traditional_...`. Warehouse,
+dry rig: reuse 17 viewpoints / 80 m, traditional 24 / 90 m. Room fit (recon/roomfit.py): floor and ceiling first, then each wall
+from the occupied voxels between them, placed on the densest slice within `fit.wall_artifact_m` inward of the outermost one (a
+weaker sheet beyond it is that wall mapped again after pose drift: fitting to it left the real wall inside the room as an obstacle).
 Outputs in `<run>/explore/`: `scene.yaml` (the fitted room in scene-file format), `occupancy.npz`, `steps.jsonl` (one record per view:
 faces seen, known fraction, frontier, target) and `report.json` (with `vs_truth` when a scene file is given). `steps.jsonl` of the
 run itself still starts with the tour plan. Dry rig: `core/simdepth.py` ray-casts depth against a true scene the planner never

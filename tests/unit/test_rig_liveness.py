@@ -48,6 +48,7 @@ def _rig(**kw):
     r.rc = {"silent_timeout_s": 30.0, "setpoint_hz": 200}
     r._rclpy = SimpleNamespace(ok=lambda: True)
     r._dead, r._rx_wall, r.started, r.state = None, time.time(), True, SimpleNamespace(armed=True, mode="OFFBOARD")
+    r.cmd_yaw = r._yaw_t = None
     r.__dict__.update(kw)
     return r
 
@@ -123,3 +124,15 @@ def test_divergence_check_is_off_before_the_start():
     r = _diverged_rig(45.0)
     r.started = False
     r._check_diverged()
+
+
+def test_yaw_setpoint_turns_at_the_paced_rate():
+    """A yaw step made PX4 turn at 60 deg/s and the ZED's pose lagged 4-5 deg (2026-10-27): the streamed yaw is paced."""
+    r = object.__new__(MavrosRig)
+    clock = [0.0]
+    r.now, r.rc, r.cmd_yaw, r._yaw_t = (lambda: clock[0]), {"yaw_rate_deg_s": 20.0}, None, None
+    assert r._yaw_carrot(0.0) == 0.0
+    clock[0] = 1.0
+    assert abs(np.degrees(r._yaw_carrot(np.radians(170.0))) - 20.0) < 1e-6      # 1 s at 20 deg/s
+    clock[0] = 2.0
+    assert abs(np.degrees(r._yaw_carrot(np.radians(-170.0))) - 40.0) < 1e-6     # 20 -> -170 is +170 the short way round

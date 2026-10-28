@@ -87,6 +87,7 @@ class MavrosRig:
         self.sp = None                          # (p, yaw) body setpoint target
         self.cmd = None                         # carrot: the position actually streamed, moving towards sp at cruise_mps
         self._cmd_t = None
+        self.cmd_yaw, self._yaw_t = None, None    # ... and the yaw, turning towards sp at yaw_rate_deg_s
         self.world_to_map = np.asarray(scene.world_to_map, dtype=float)
         self.map_shift = np.zeros(3)             # measured - nominal world_to_map; the loop moves the scene by it
         self.bag = None                         # ros2 bag record child process
@@ -137,6 +138,18 @@ class MavrosRig:
         self.cmd = target.copy() if dist <= step else self.cmd + d * (step / dist)
         return self.cmd
 
+    def _yaw_carrot(self, target: float) -> float:
+        """Turn the streamed yaw towards `target` by at most yaw_rate_deg_s x elapsed sim time. A yaw step makes PX4 turn at
+        MC_YAWRATE_MAX (60 deg/s): the ZED's pose then lags 4-5 deg / 0.5 m for seconds (flight 20261027-164441)."""
+        now = self.now()
+        if self.cmd_yaw is None:
+            self.cmd_yaw, self._yaw_t = target, now
+        step = np.radians(float(self.rc.get("yaw_rate_deg_s", 50.0))) * max(0.0, now - self._yaw_t)
+        self._yaw_t = now
+        d = wrap(target - self.cmd_yaw)
+        self.cmd_yaw = target if abs(d) <= step else wrap(self.cmd_yaw + np.sign(d) * step)
+        return self.cmd_yaw
+
     def _path_setpoint(self):
         """fly_path carrot: advance the path clock with sim time (paused while the drone lags > max_lead_m behind) and
         interpolate position and yaw at it."""
@@ -162,12 +175,12 @@ class MavrosRig:
                     pos, yaw = self._path_setpoint()
                     sp = (pos, yaw)
                 if sp is not None:
-                    pos = sp[0] if self.path is not None else self._carrot(sp[0])
+                    pos, yaw = sp if self.path is not None else (self._carrot(sp[0]), self._yaw_carrot(sp[1]))
                     m = self._PoseStamped()
                     m.header.stamp = self.node.get_clock().now().to_msg()
                     m.header.frame_id = "map"
                     m.pose.position.x, m.pose.position.y, m.pose.position.z = (float(v) for v in pos)
-                    qx, qy, qz, qw = R_to_quat(rot_z(sp[1]))
+                    qx, qy, qz, qw = R_to_quat(rot_z(yaw))
                     m.pose.orientation.x, m.pose.orientation.y, m.pose.orientation.z, m.pose.orientation.w = qx, qy, qz, qw
                     self.sp_pub.publish(m)
             except Exception as e:  # noqa: BLE001 (a dead stream drops OFFBOARD: say so, the waits abort on it)
@@ -343,7 +356,7 @@ class MavrosRig:
         with self.lock:
             self.home = self.body[0].copy()
         yaw0 = self._body_yaw()
-        self.cmd = None
+        self.cmd = self.cmd_yaw = None
         self.sp = (self.home.copy(), yaw0)
         time.sleep(1.5)                                      # PX4 needs a setpoint stream before OFFBOARD
         for _ in range(10):
@@ -560,7 +573,7 @@ class MavrosRig:
             with self.lock:                           # hold where we are (finish() takes over from here)
                 self.sp = (self.body[0].copy(), self._body_yaw())
             self.path = None
-            self.cmd = None
+            self.cmd = self.cmd_yaw = None
             self.node.destroy_subscription(sub)
             if dsub is not None:
                 self.node.destroy_subscription(dsub)

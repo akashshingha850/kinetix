@@ -53,11 +53,13 @@ explore:                         # exploration pass for an unknown room (planner
   max_time_s: 240.0              # sim seconds of exploring at most (EKF2 drifts with flight time)
   tour_min_wall: 0.10            # the tour flies only if every wall and the floor were seen at least this much (else: land, no tour)
   max_steps: 20                  # frontier views after the sweep. Keep exploration short: EKF2 drifts (sim: ~0.2 m in 5 min, >1 m by 10 min)
-  rig:                           # rig tolerances while exploring (a fresh depth image, not a hover): ~3x faster per view
+  rig:                           # rig settings while exploring (a fresh depth image, not a hover)
     tol_pos_m: 0.35
     tol_yaw_deg: 10.0
     tol_speed_mps: 0.3
-    settle_s: 0.2
+    settle_s: 1.0                # slow (2026-10-27, Warehouse, one flight each): 1 m/s + 60 deg/s turns + 0.2 s gave 5 false obstacles
+    cruise_mps: 0.5              # and no tour (pose 0.59 m off after a turn); 0.5 m/s + 20 deg/s + 1 s gave 0 and a tour. Yaw spikes of
+    yaw_rate_deg_s: 20.0         # 4-7 deg after a turn stayed either way (bisg side). Slower = longer: 28 views took 238 of max_time_s 240
   min_views: 6                   # never stop as closed before this many views
   stable_steps: 4                # ... or stop when the fitted room and obstacle count stayed put for this many steps
   stable_tol_m: 0.3              # (a wall moves less than this between fits)
@@ -103,6 +105,7 @@ explore:                         # exploration pass for an unknown room (planner
     min_obstacle_voxels: 25      # smaller blobs are noise
     wall_artifact_m: 2.0         # a thin sheet this close to a wall is that wall seen again after pose drift, not an obstacle
     workspace_margin_m: 1.5      # the drone stays this far from the walls
+    obstacle_reach_m: 1.0        # an obstacle counts only if it comes this close to the workspace (>= planner.clearance_m, rooms 0.8)
     altitude_above_floor_m: [1.1, 4.9]   # camera height band over the floor
 
 rig:
@@ -126,7 +129,7 @@ rig:
   speed_mps: 0.5                 # nominal, for the dry rig's time estimate
   dry_noise_m: 0.0
   cruise_mps: 0.8                # the streamed setpoint moves to the target at most this fast (carrot; VIO-safe, bisg vio_bench legs 0.5-1 m/s)
-  yaw_rate_deg_s: 50.0           # fly_path: turns are paced at this rate (PX4 MC_YAWRATE_MAX 60 in bisg's GPS-denied mode)
+  yaw_rate_deg_s: 50.0           # every turn is paced at this rate, moves and fly_path (a yaw step = PX4 MC_YAWRATE_MAX 60 deg/s)
   max_lead_m: 1.5                # fly_path: the path clock pauses while the drone is further than this behind the setpoint
   stall_s: 20.0                  # ... and the flight is aborted when it stays more than 3x that behind for this long (sim seconds)
   max_speed_mps: 4.0             # EKF2 speed above this is not this drone (sim: its estimate diverged): abort and land

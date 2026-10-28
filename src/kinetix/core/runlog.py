@@ -27,8 +27,9 @@ def _git(root: Path) -> dict:
 
 class RunLog:
     def __init__(self, out_root: Path | str, scene: str, method: str, rig: str, seed: int, cfg: dict, uses_gt: bool,
-                 repo_root: Path | None = None):
-        self.run_id = f"{time.strftime('%Y%m%d-%H%M%S')}_{scene}_{method}_{rig}_s{seed}"
+                 repo_root: Path | None = None, tag: str = ""):
+        # tag (e.g. explore-optimized) only names the run dir: run.yaml keeps `method`, which kinetix sfm reads
+        self.run_id = f"{time.strftime('%Y%m%d-%H%M%S')}_{scene}_{method}{'-' + tag if tag else ''}_{rig}_s{seed}"
         self.dir = Path(out_root) / self.run_id
         (self.dir / "frames").mkdir(parents=True, exist_ok=True)
         self.t0 = time.time()

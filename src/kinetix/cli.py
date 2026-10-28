@@ -24,7 +24,8 @@ def cmd_run(a) -> int:
     if a.explore:                       # the scene file only scores the fit: planner and rig get a take-off point and a search volume
         from kinetix.planner.explore import hint_scene
         truth, scene = scene, hint_scene(scene, cfg["explore"]["volume_m"])
-    log = RunLog(a.out, scene.name, a.method, a.rig, a.seed, cfg, uses_gt=False, repo_root=ROOT)
+    tag = ("explore-optimized" if cfg["explore"]["reuse_views"] else "explore-traditional") if a.explore else ""
+    log = RunLog(a.out, scene.name, a.method, a.rig, a.seed, cfg, uses_gt=False, repo_root=ROOT, tag=tag)
     log.info(f"run {log.run_id}: scene {scene.name} ({scene.kind}), method {a.method}, rig {a.rig}, "
              f"budget {cfg['planner']['budget']}")
     cam = cfg["camera"]

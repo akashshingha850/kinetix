@@ -8,16 +8,22 @@ FC-Planner), with images taken while moving. This module is that recipe on the e
 1. `select_viewpoints`: greedy set cover on the proxy surface (gain only, no travel cost) up to `coverage_target`;
 2. `order_tour`: open TSP from the start pose, nearest neighbour + 2-opt, cost = metres + `yaw_cost_m` per radian of turn;
 3. `sample_path`: the polyline through the ordered views, sampled every `step_m` with yaw interpolated per segment; what
-   a continuously recording camera sees (used to score a plan on the dry rig, and as the rig's carrot path).
+   a continuously recording camera sees (used to score a plan on the dry rig, and as the rig's carrot path);
+4. `run_tour`: plan, then fly the path once and keep keyframes (after an exploration of the room with `explore.enabled`).
 
 Pure numpy: never imports rclpy or a rig adapter (dependency rule).
 """
 from __future__ import annotations
 
+import time
+
 import numpy as np
 
 from kinetix.core.geometry import camera_pose, camera_yaw, wrap
-from kinetix.core.types import Candidate, Frame, Pose
+from kinetix.core.types import Candidate, Frame, Pose, RigError, Scene, shifted
+from kinetix.planner.constraints import BoxConstraints
+from kinetix.planner.loop import apply_shift
+from kinetix.planner.sampler import GridSampler
 
 
 def select_viewpoints(cands: list[Candidate], feasible: np.ndarray, recon, coverage_target: float, budget: int,
@@ -100,3 +106,74 @@ def flight_time(dist_m: float, yaw_rad: float, n_corners: int, cruise_mps: float
     """Rough flight time of a continuous tour: cruise along the path, turns overlap the straight parts except where a turn
     is longer than its segment, plus a short slow-down per corner (no stopping)."""
     return dist_m / cruise_mps + max(0.0, yaw_rad / yaw_rate - dist_m / cruise_mps) + corner_s * n_corners
+
+
+def run_tour(cfg: dict, scene: Scene, rig, recon, log, truth: Scene | None = None) -> dict:
+    """Plan the whole capture, then fly it without stopping and keep keyframes (ADR-K12, planner/tour.py). With
+    `explore.enabled` (ADR-K13) the room is not read from the scene file: the drone first explores it with the ZED depth
+    (planner/explore.py) and the tour is planned on the fitted scene; `truth` (sim) only scores that fit."""
+    from kinetix.recon.coverage import CoverageState
+    pc, tc = cfg["planner"], cfg["planner"]["tour"]
+    stop_reason, explored = None, []
+    try:
+        rig.start()                                   # inside the try: a failed start still runs finish()
+        if cfg.get("explore", {}).get("enabled"):
+            from kinetix.planner.explore import run_explore
+            shift = np.asarray(getattr(rig, "map_shift", np.zeros(3)), dtype=float)
+            scene, rep = run_explore(cfg, scene, rig, log, shifted(truth, shift) if truth is not None else None, explored)
+            if scene is None:
+                return {"stop_reason": "explore_failed", "coverage": 0.0, "seen": 0.0}
+            seen = {k: v for k, v in rep["faces"].items() if k != "ceiling"}      # the ceiling is far and often out of range
+            if min(seen.values()) < cfg["explore"]["tour_min_wall"]:
+                log.info(f"explore: {min(seen, key=seen.get)} seen only {min(seen.values()):.0%} (stop: {rep['stop_reason']}): the "
+                         "fitted room is not trustworthy, landing instead of touring it")
+                return {"stop_reason": "explore_incomplete", "coverage": 0.0, "seen": 0.0}
+            recon = CoverageState.for_scene(scene, recon.K, cfg["coverage"])
+            for f in explored:                        # what exploration already saw counts: the tour flies the gaps
+                recon.add(f)
+            log.info(f"tour on the explored room (stop: {rep['stop_reason']}); {len(explored)} reused views cover {recon.coverage:.3f}")
+        else:
+            scene = apply_shift(rig, scene, recon, log)
+        t0 = time.time()
+        g = pc["grid"]
+        sampler = GridSampler(g["spacing_m"], g["heights"], g["n_yaw"])
+        cands = sampler.sample(scene, recon, rig.caps)
+        start = rig.pose()
+        feas = BoxConstraints(pc["clearance_m"], pc["roi_clearance_m"]).feasible(cands, start, scene)
+        if not feas.any():                            # e.g. the start is inside an obstacle's keep-out box: land instead of crashing
+            log.info(f"tour: none of {len(cands)} candidate viewpoints is feasible from here")
+            return {"stop_reason": "no_feasible_view", "coverage": round(recon.coverage, 4), "seen": round(recon.seen, 4)}
+        cc = dict(cfg["coverage"], min_shared=0, min_overlap=0.0)   # continuous capture links the views
+        plan = CoverageState.for_scene(scene, recon.K, cc)
+        for f in explored:
+            plan.add(f)
+        vp = select_viewpoints(cands, feas, plan, tc["coverage_target"], pc["budget"])
+        poses = [cands[j].pose for j in vp]
+        order = order_tour(start, poses, tc["yaw_cost_m"])
+        tour = [poses[i] for i in order]
+        dist, yaw = tour_length(start, tour)
+        est = flight_time(dist, yaw, len(tour), cfg["rig"]["cruise_mps"], np.radians(cfg["rig"]["yaw_rate_deg_s"]))
+        rec = {"step": 0, "plan": "tour", "n_cands": len(cands), "n_feasible": int(feas.sum()), "viewpoints": len(tour),
+               "plan_coverage": round(plan.coverage, 4), "tour_m": round(dist, 1), "tour_yaw_deg": round(float(np.degrees(yaw))),
+               "est_flight_s": round(est, 1), "t_plan_s": round(time.time() - t0, 2),
+               "waypoints": [[cands[vp[i]].pool_id] for i in order]}
+        log.step(rec)
+        log.info(f"tour: {len(tour)} viewpoints (plan coverage {plan.coverage:.3f}), {dist:.0f} m, {np.degrees(yaw):.0f} deg "
+                 f"of turn, est. flight {est / 60:.1f} min, planned in {rec['t_plan_s']} s")
+        path = sample_path(start, tour, tc["path_step_m"], np.radians(tc["path_step_deg"]), rig.caps.mount_pitch_rad)
+
+        def on_frame(frame):
+            recon.add(frame)
+            log.frame(frame)
+            if frame.idx % 25 == 0:
+                log.info(f"keyframe {frame.idx}: coverage {recon.coverage:.3f} (seen {recon.seen:.3f}), "
+                         f"travel {log.travel_m:.0f} m")
+        try:
+            rig.fly_path(path, tc["keyframe_step_m"], np.radians(tc["keyframe_step_deg"]), on_frame)
+            stop_reason = "tour_done"
+        except RigError as e:
+            log.info(f"tour: {e}")
+            stop_reason = e.kind
+    finally:
+        rig.finish()
+    return {"stop_reason": stop_reason, "coverage": round(recon.coverage, 4), "seen": round(recon.seen, 4)}
