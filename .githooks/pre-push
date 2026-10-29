@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Upload the large files of the committed runs the release does not have yet (data/sync.sh push --new); a failed upload stops the
+# push, so no run reaches git without its files. Skip once: git push --no-verify
+exec "$(git rev-parse --show-toplevel)/data/sync.sh" push --new

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# After switching branch ($3 = 1): the new branch may have runs whose large files are not here (data/sync.sh pull --all)
+[[ ${3:-0} == 1 && $1 != "$2" ]] || exit 0
+"$(git rev-parse --show-toplevel)/data/sync.sh" pull --all || echo "[sync] download failed, retry: data/sync.sh pull --all" >&2

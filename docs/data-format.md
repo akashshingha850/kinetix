@@ -95,7 +95,7 @@ frames/<idx>_R.png right images (stereo_rig* modes only)
 depth/<idx>.npy    depth used for planning (+ <idx>_conf.npy), when plan_depth ≠ none; or, with `rig.save_depth` (room scenes), the ZED
                    depth_registered of every captured frame (float32 m, NaN = no return), `frames.jsonl` `depth` + `depth_source: zed`
 sfm/online/        final online model (COLMAP binary, acquisition's online SfM)
-rosbag/            MCAP recording of the flight (T2/T3, `rig.bag`; topics in interfaces.md §4). Large; never in git
+rosbag/            MCAP recording of the flight (T2/T3, `rig.bag`; topics in interfaces.md §4). Large; never in git (`data/sync.sh`)
 log.txt            human log
 ```
 

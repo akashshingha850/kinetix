@@ -1,0 +1,32 @@
+name: data prune
+# A push that deletes data/<run>/ deletes that run's release copy (data/sync.sh prune), unless another branch still has the run.
+# Uploads cannot run here: the large files exist only on the machine that flew the run (.githooks/pre-push uploads them).
+on:
+  push:
+    paths: ["data/*/run.yaml"]
+# Needs the secret KX_DATA_TOKEN: a fine-grained token with Contents read/write on akashshingha850/kinetix-data (the release is
+# in that private repo, which this workflow's own token cannot reach).
+permissions:
+  contents: read
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # every branch, to check none still has the run
+      - name: delete the release copies of runs this push deleted
+        env:
+          BEFORE: ${{ github.event.before }}
+          GH_TOKEN: ${{ secrets.KX_DATA_TOKEN }}
+        run: |
+          [ -n "$GH_TOKEN" ] || { echo "::error::secret KX_DATA_TOKEN is not set (see the comment at the top of this workflow)"; exit 1; }
+          git cat-file -e "$BEFORE^{commit}" 2>/dev/null || { echo "no previous commit (new branch or force push): nothing to prune"; exit 0; }
+          gone=""
+          for r in $(git diff --diff-filter=D --name-only "$BEFORE" HEAD -- 'data/*/run.yaml' | cut -d/ -f2); do
+            for b in $(git for-each-ref --format='%(refname)' refs/remotes/origin); do
+              git cat-file -e "$b:data/$r/run.yaml" 2>/dev/null && { echo "$r: still on ${b#refs/remotes/origin/}, kept"; continue 2; }
+            done
+            gone="$gone $r"
+          done
+          if [ -n "${gone// /}" ]; then data/sync.sh prune -y $gone; else echo "nothing to prune"; fi
