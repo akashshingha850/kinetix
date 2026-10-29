@@ -22,6 +22,7 @@ import numpy as np
 from acquisition.planner.constraints import BoxConstraints
 from acquisition.planner.loop import apply_shift
 from acquisition.planner.sampler import GridSampler
+from kinetix.coverage import segments_hit_box
 from kinetix.geometry import camera_pose, camera_yaw, wrap
 from kinetix.types import Candidate, Frame, Pose, RigError, Scene, shifted
 
@@ -43,6 +44,29 @@ def select_viewpoints(cands: list[Candidate], feasible: np.ndarray, recon, cover
         recon.add(Frame(len(chosen) - 1, 0.0, None, recon.K, p, p, None, 0.0))
         idx = np.delete(idx, k)
     return chosen
+
+
+def reach_range(plan, positions: np.ndarray, pitch: float, factor: float, near_m: float) -> np.ndarray:
+    """Per-point far limit for `plan` (a CoverageState): `factor` x the closest distance from which any of `positions` can see
+    the point (line of sight, incidence limit, inside the vertical field of view of a camera at mount `pitch`; yaw is free),
+    clipped to [near_m, plan's far limit]. A wall is then only counted as covered from close up, while the ceiling and the
+    tops of the walls, which a level camera sees only from afar, keep the range they need."""
+    far = float(plan.depth_range[1])
+    K = plan.K
+    half_v = np.arctan((0.5 - plan.border) * K.height / K.fy)
+    best = np.full(len(plan.P), np.inf)
+    for c in positions:
+        d = c[None] - plan.P                          # point -> camera
+        dist = np.linalg.norm(d, axis=1)
+        ray = d / np.maximum(dist[:, None], 1e-9)
+        elev = np.arcsin(np.clip(-ray[:, 2], -1.0, 1.0))                 # of the camera -> point direction
+        ok = (np.einsum("ij,ij->i", plan.N, ray) > plan.cos_inc) & (np.abs(elev + pitch) < half_v)   # pitch > 0 = tilted down
+        idx = np.flatnonzero(ok & (dist < best))
+        for b in plan.occluders:
+            if len(idx):
+                idx = idx[~segments_hit_box(c, plan.P[idx], b)]
+        best[idx] = dist[idx]
+    return np.clip(factor * best, near_m, far)
 
 
 def _cost(a: Pose, b: Pose, yaw_cost_m: float) -> float:
@@ -145,6 +169,10 @@ def run_tour(cfg: dict, scene: Scene, rig, recon, log, truth: Scene | None = Non
             return {"stop_reason": "no_feasible_view", "coverage": round(recon.coverage, 4), "seen": round(recon.seen, 4)}
         cc = dict(cfg["coverage"], min_shared=0, min_overlap=0.0)   # continuous capture links the views
         plan = CoverageState.for_scene(scene, recon.K, cc)
+        if tc.get("range_factor"):                    # count a surface as covered only from near its closest reachable view
+            pos = np.unique(np.round([cands[j].pose.p for j in np.flatnonzero(feas)], 3), axis=0)
+            reach = reach_range(plan, pos, rig.caps.mount_pitch_rad, tc["range_factor"], tc["near_m"])
+            plan.depth_range = (plan.depth_range[0], reach)
         for f in explored:
             plan.add(f)
         vp = select_viewpoints(cands, feas, plan, tc["coverage_target"], pc["budget"])

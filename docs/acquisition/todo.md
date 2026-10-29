@@ -102,6 +102,28 @@ How to run it: `METHOD=tour scripts/room_scan.sh all` (sim up, fly, `kinetix sfm
   fx 530), because the coverage model counts surface up to 12 m (`room.yaml` `depth_range_m`); (b) max triangulation angle per point
   median 7.5 deg, 34 % below 5 deg; (c) the sim renders no motion blur (Laplacian variance vs speed r = -0.02, 0.6-1.3 m/s), so a sim
   speed study says nothing about blur
+- [ ] Viewing distance vs flight cost (2026-10-29, `acquisition/tests/tour_bench.py`, dry rig, known Warehouse, 20 m true sight).
+  The ray model reproduces `163032`'s far views: nearest viewing distance p50 9.0 m flown / 9.2 m dry, a close (<= 5 m) 8-20 deg pair
+  (`near_tri`) on 0.7 % / 4 % of the surface; it cannot predict SfM's track angle (chains continuous keyframes into 59 deg tracks
+  where SfM had 7.5 deg), so that stays an SfM measurement. A flat `depth_range_m` cap <= 5 m loses half the room (a level camera at
+  1.2-4.4 m sees the 9 m ceiling and the wall tops only from >= ~8 m). `planner.tour.range_factor` (off by default) counts each surface
+  point only from within factor x its closest reachable viewing distance (line of sight, incidence, vertical FOV), clipped to
+  [near_m 5, 12 m]. x1.5: budget 120 -> 120 viewpoints, 919 keyframes, 274 m, est. 5.8 min, near_tri 0.30, all surface seen (today:
+  24 / 301 / 101 m / 1.9 min / 0.04); budget 400 -> 2283 keyframes, 12.4 min, near_tri 0.40, still short of the 0.8 plan target.
+  Flown (`20261029-115558`, explore + x1.5, fresh sim, same config as `163032` but the knob): 958 keyframes, 288 m, 15.5 min wall;
+  SfM ATE vs GT rmse 1.30 -> 0.11 m (median 0.21 -> 0.09, max 20.6 -> 0.73), completeness 0.41 -> 0.57 (walls 0.33 -> 0.50),
+  points 23 k -> 58 k, track length 6.4 -> 6.9; nearest view p50 9.0 -> 7.0 m. But near_tri only 0.058 (dry `--explore` the same,
+  0.075): the fitted floor sat 4 cm high, the band started at 1.257 m and `grid_poses` dropped the 1.2 m layer (its doc said clip),
+  so the floor was only seen from >= 2.8 m. Fixed (2026-10-29): heights are clipped into workspace + altitude band, not dropped
+  (`test_grid_heights_outside_the_workspace_are_clipped_not_dropped`); dry `--explore` x1.5 near_tri 0.075 -> 0.28.
+  Flown again (`20261029-132346`, `explore.max_steps=26`: two flights at 20 never reached the y- end, `125530` landed, `130358`
+  fitted the room 3.2 m short): near_tri 0.30, near_seen 0.37 (was 0.175), 928 keyframes, 341 m, coverage 0.98. SfM, though, is no
+  better than without the fix: ATE rmse 0.15 m (median 0.096; was 0.11 / 0.091), completeness 0.53 (was 0.57; walls 0.52 vs 0.50,
+  floor 0.54 vs 0.63, ceiling 0.53 vs 0.63), one flight each. So the gain over `163032` comes from more viewpoints (120 vs 24), not
+  from closer views, as far as ATE and the 0.25 m completeness proxy can tell (neither sees GSD). Exploration at max_steps 20 is
+  marginal in the Warehouse (2 of 4 flights missed the y- end after a first move that saw ~0 frontier). Next: the control, budget
+  120 at a flat 12 m (more views, not closer), and a resolution metric (GSD / point density on the true surface) before trading
+  flight time for distance
 - [ ] Explore, pose after big turns: capture only once the VIO has settled (spikes of 4-5.5 deg / 0.3-0.6 m for seconds), or slower
   turns while exploring; bisg side: why the ZED/EKF yaw jumps after a turn (map_correction / compass in the zed bridge)
 - [x] Room fit: obstacles must reach within `fit.obstacle_reach_m` (1 m) of the workspace (2026-10-27): roof beams at 8 m dropped

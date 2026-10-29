@@ -38,14 +38,16 @@ class RingSampler:
 
 def grid_poses(scene: Scene, caps: RigCaps, spacing: float, heights, n_yaw: int) -> list[Candidate]:
     """Positions on an xy grid with `spacing` m, centred in the workspace box, at the given map heights (clipped to the
-    workspace); n_yaw headings each (0 = +x). Infeasible ones (obstacles, altitude) are left to the constraints."""
+    workspace and the altitude band); n_yaw headings each (0 = +x). Infeasible ones (obstacles, altitude) are left to the constraints."""
     lo, hi = scene.workspace.lo, scene.workspace.hi
     axes = []
     for k in range(2):
         n = int(np.floor((hi[k] - lo[k]) / spacing)) + 1
         off = (hi[k] - lo[k] - (n - 1) * spacing) / 2
         axes.append(lo[k] + off + spacing * np.arange(n))
-    zs = [z for z in heights if lo[2] <= z <= hi[2]]
+    # clip, not drop: a fitted floor 4 cm high put 1.2 m below the band and lost the low layer (flight 20261029-115558)
+    zlo, zhi = max(lo[2], scene.altitude[0]), min(hi[2], scene.altitude[1])
+    zs = sorted({float(np.clip(z, zlo, zhi)) for z in heights})        # unrounded: the band check is exact
     out = []
     for x in axes[0]:
         for y in axes[1]:
