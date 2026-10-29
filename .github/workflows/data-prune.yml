@@ -20,7 +20,6 @@ jobs:
           BEFORE: ${{ github.event.before }}
           GH_TOKEN: ${{ secrets.KX_DATA_TOKEN }}
         run: |
-          [ -n "$GH_TOKEN" ] || { echo "::error::secret KX_DATA_TOKEN is not set (see the comment at the top of this workflow)"; exit 1; }
           git cat-file -e "$BEFORE^{commit}" 2>/dev/null || { echo "no previous commit (new branch or force push): nothing to prune"; exit 0; }
           gone=""
           for r in $(git diff --diff-filter=D --name-only "$BEFORE" HEAD -- 'data/*/run.yaml' | cut -d/ -f2); do
@@ -29,4 +28,7 @@ jobs:
             done
             gone="$gone $r"
           done
-          if [ -n "${gone// /}" ]; then data/sync.sh prune -y $gone; else echo "nothing to prune"; fi
+          [ -n "${gone// /}" ] || { echo "nothing to prune"; exit 0; }
+          # checked only now, so pushes that delete nothing stay green without the secret
+          [ -n "$GH_TOKEN" ] || { echo "::error::secret KX_DATA_TOKEN is not set (see the comment at the top of this workflow)"; exit 1; }
+          data/sync.sh prune -y $gone
