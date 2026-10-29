@@ -11,8 +11,8 @@ imports the other, and `kinetix/` imports neither.
 kinetix/              shared library (types, geometry, config, runlog, align, coverage, cli) + scenes/ + tests/
 acquisition/          author A: planner/  mapping/  rig/  config/  tests/
 reconstruction/       author B: sfm.py (densify.py, ...)  tests/
-data/<run>/           flights, git-ignored: acquisition writes, reconstruction reads
-results/<run>/<m>/    outputs, git-ignored: reconstruction writes, one folder per method
+data/<run>/           flights: acquisition writes, reconstruction reads (text in git, large files on the release)
+results/<run>/<m>/    outputs: reconstruction writes, one folder per method (same split)
 docs/                 shared docs at the top (architecture, data-format, interfaces, decisions, roadmap, setup, testing)
   acquisition/        architecture.md (loop, tour, explore, NBV), ros-pipeline.md, todo.md
   reconstruction/     pipeline.md, todo.md
@@ -40,12 +40,31 @@ docker/  scripts/
 
 ## Shared data
 
-`data/` is git-ignored (GBs per flight), so the flights are shared outside git:
+A run's small text files (`run.yaml`, `frames.jsonl`, `steps.jsonl`, `log.txt`, `explore/`, `metrics.json`, ...) are in git. The
+large ones (`frames/`, `depth/`, `rosbag/`, the SfM `database.db`, `sparse/`, `tri/`, `*.ply`: GBs per flight; the list is
+`.gitignore`) go to the release `data` of the private repo `akashshingha850/kinetix-data` (each author needs access; the Action
+needs the secret `KX_DATA_TOKEN`, see the workflow) as one zip per run (split in < 2 GiB parts). **git says which runs exist**; the
+release only stores their large files. It syncs on git's own steps, once per clone `git config core.hooksPath .githooks`:
+
+| you do | runs | effect |
+|---|---|---|
+| commit a run, `git push` | `.githooks/pre-push` | uploads the committed runs the release does not have (a failed upload stops the push; `--no-verify` skips) |
+| `git pull`, `git switch` | `.githooks/post-merge`, `post-checkout` | downloads the runs in git whose large files are not here; a pull that deletes a run removes it here too |
+| delete `data/<run>/`, commit, push | `.github/workflows/data-prune.yml` | deletes the run's release copy, unless another branch still has it (it is gone for good: keep a run with `drop`) |
+
+Uploads cannot run in the Action: the large files exist only on the machine that flew the run. By hand, `data/sync.sh ...`:
+
+| command | does |
+|---|---|
+| `status` | every run: in git, large files here (or `dropped`), on the release |
+| `push RUN...` / `push --new` | upload (a named run is re-uploaded) / what the pre-push hook does |
+| `pull RUN...` / `pull --all` | download + unzip in place / what the pull hooks do (skips dropped runs) |
+| `drop RUN...` | free disk: delete the local large files only; git and the release keep it, `pull --all` skips it here (`data/.dropped`), `pull RUN` brings it back |
+| `delete RUN...` | delete the run everywhere (local, `git rm`, release); commit it |
+| `prune [RUN...]` | delete release copies of runs not in git (a branch the Action kept them for was deleted since) |
 
 - **Frozen benchmark runs.** Reconstruction is compared on a fixed set of flights, so new acquisition work cannot shift its results.
   Start with `20261028-163032_warehouse_room_tour-explore-optimized_mavros_s0`. Add runs to the list here, never edit a listed run.
-- Copy them to shared storage (`$KINETIX_DATA/data/`, or rsync between the two workstations). Copy without `rosbag/` unless needed:
-  `rsync -a --exclude rosbag data/<run> <host>:<path>/data/`.
 - Acquisition reports a new method on its own new flights, then hands the run IDs over for reconstruction.
 
 | Frozen run | Method | Keyframes | Notes |

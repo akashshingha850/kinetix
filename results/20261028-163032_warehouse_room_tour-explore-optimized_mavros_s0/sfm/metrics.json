@@ -1,0 +1,55 @@
+{
+ "n_frames": 267,
+ "pose_source": "prior",
+ "pairing": "video",
+ "pairs": 2958,
+ "rig_check": {
+  "kept": 1983,
+  "unchecked": 0,
+  "dropped_rotation": 297,
+  "dropped_direction": 437,
+  "max_rot_deg": 5.0,
+  "max_dir_deg": 30.0,
+  "min_baseline_m": 0.5
+ },
+ "position_priors": null,
+ "registered": 267,
+ "registered_frac": 1.0,
+ "models": 1,
+ "models_sizes": [
+  267
+ ],
+ "points3D": 22781,
+ "mean_track_length": 6.38,
+ "mean_reproj_error_px": 0.604,
+ "time_s": {
+  "features": 11.6,
+  "matching": 2.4,
+  "mapping": 12.5,
+  "total": 26.7
+ },
+ "ate_vs_ekf2": {
+  "rmse_m": 1.3144,
+  "median_m": 0.2314,
+  "max_m": 20.6753,
+  "scale": 1.0329,
+  "n": 267
+ },
+ "ate_vs_gt": {
+  "rmse_m": 1.3,
+  "median_m": 0.2087,
+  "max_m": 20.5516,
+  "scale": 1.0389,
+  "n": 267
+ },
+ "ekf2_vs_gt_m": 0.3433,
+ "completeness_proxy": {
+  "all": 0.4079,
+  "floor": 0.3967,
+  "ceiling": 0.5389,
+  "walls": 0.3317,
+  "voxel_m": 0.25,
+  "surface_points": 8718,
+  "scene": "/kinetix/config/scenes/warehouse_room.yaml"
+ }
+}

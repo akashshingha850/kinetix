@@ -142,8 +142,8 @@ reconstruction/                  author B: turns a flight into a model and score
   metrics.py     accuracy, completeness, Chamfer, F-score, ATE, PSNR/SSIM
   evaluate.py    run dir → metrics.json
   tests/
-data/            flights, one run dir each (git-ignored, data-format.md §3); written by acquisition
-results/         results/<run>/<method>/ (git-ignored); written by reconstruction
+data/            flights, one run dir each (large files git-ignored, data/sync.sh; data-format.md §3); written by acquisition
+results/         results/<run>/<method>/ (large files git-ignored, same); written by reconstruction
 bench/           matrix.py (scenes × methods × budgets × seeds → runs), report.py (tables + efficiency curves)
 sim/             render_server.py (Isaac standalone, pool batch + serve mode), scene build helpers
 docker/          Dockerfile (ros:jazzy-ros-base), compose.yaml

@@ -22,4 +22,4 @@ data-format/interfaces/publication-plan, deps) change by a separate PR. Tests li
 - Before a sim run on workstation B, check `nvidia-smi` and stop `lc-chat` (vLLM) if it holds VRAM.
 - Tests: `uv run pytest` (unit + t0). `-m t1` / `-m t2` need the sim (`docs/testing.md`).
 - Rooms (`kind: room` scenes): method `tour` + `kinetix sfm` (known-pose triangulation) is the capture path; each flight records an
-  MCAP rosbag to `data/<run>/rosbag/` (git-ignored, GBs). Room numbers in the docs are from the bisg Warehouse at its default lighting.
+  MCAP rosbag to `data/<run>/rosbag/` (git-ignored, GBs; large run files sync to the GitHub release via `data/sync.sh`). Room numbers in the docs are from the bisg Warehouse at its default lighting.
