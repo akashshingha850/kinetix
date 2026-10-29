@@ -36,6 +36,9 @@ planner:
     path_step_deg: 3.0
     keyframe_step_m: 0.4         # keep an image every 0.4 m or 6 deg of camera motion (sequential overlap for SfM)
     keyframe_step_deg: 6.0
+    range_factor: null           # set (e.g. 1.5): a surface point counts as covered only from within factor x its closest reachable
+                                 # viewing distance (planner/tour.py reach_range), clipped to [near_m, coverage.depth_range_m]; null = the flat range
+    near_m: 5.0
 
 rig:
   save_depth: true               # pose + depth per frame for depth-aided photogrammetry (depth/<idx>.npy next to frames/<idx>.png)
