@@ -55,7 +55,7 @@ Capture on the move is a K5 optimisation with its own benchmark row (flight-time
 
 **Context.** The drone carries a ZED Mini (stereo). A monocular-only design leaves "why not use the
 stereo?" unanswered, and ActMVS (2026) narrows the monocular novelty claim. Study:
-[research/mono-vs-stereo.md](research/mono-vs-stereo.md).
+[paper/research/mono-vs-stereo.md](paper/research/mono-vs-stereo.md).
 **Decision.** Two independent config axes, `sensing.plan_depth` (none | mono | stereo | gt) and
 `sensing.recon_input` (left | stereo_rig | stereo_rig+depth), with named presets. `mono` stays the
 Kinetix method. Stereo presets are comparisons that run through the same loop, offline pipeline and
@@ -67,10 +67,10 @@ becomes a measured mono-vs-stereo trade-off instead of an assumption.
 
 ## ADR-K08 — Position Kinetix as a measurement paper; strengthen baselines and protocol compatibility (2026-10-08, accepted)
 
-**Context.** The novelty search ([research/reports/Kinetix novelty search.md](research/reports/Kinetix%20novelty%20search.md))
+**Context.** The novelty search ([paper/research/reports/kinetix-novelty-search.md](paper/research/reports/kinetix-novelty-search.md))
 found the image-saving headline, "first monocular active reconstruction" and "foundation depth in NBV" already
 claimed. A combination and three experimental contributions remain open.
-**Decision.** The paper's claims are C1–C5 ([publication-plan.md](publication-plan.md)). The image saving is a
+**Decision.** The paper's claims are C1–C5 ([paper/publication-plan.md](paper/publication-plan.md)). The image saving is a
 reported result against the strongest baselines. The baseline set grows to fixed patterns + `fvs` + `volumetric_ig`
 + `fisherrf` + `ma_scvp`. Pools add an ObjView-Bench-compatible `tammes:128` layout with reachability masks. Metrics add
 N@q at q ∈ {0.9, 0.95} with reference-density sensitivity, coverage AUC, K = 5/30 budgets and Kendall's τ across tiers.
@@ -83,13 +83,13 @@ community-pool objects and is constrained by licences. Real flights must be quan
 **Context.** T1/T2/T3 need ROS. The current design uses two rig adapters (`IsaacRenderRig` and `MavrosRig`) that speak different
 protocols. The design has a T1 request/response emulated over topics, and `MavrosRig` subscribes to 30 Hz HD1080 image streams (≈ 250 MB/s each on
 CycloneDDS loopback) to keep one frame per view.
-**Decision.** [ros-pipeline.md](ros-pipeline.md). Planner/recon stay pure Python in one `session` node. The rig side is two
+**Decision.** [acquisition/ros-pipeline.md](acquisition/ros-pipeline.md). Planner/recon stay pure Python in one `session` node. The rig side is two
 generic nodes, `goto` (action `kinetix_msgs/Goto`, the only setpoint producer) and `snapshot` (service `kinetix_msgs/Snapshot`,
 lazy sensor subscription, stream whitelist from the sensing mode). The T1 render server serves the same two interfaces, so one
 client, `RosRig`, covers T1–T3. Kinetix itself publishes only `kinetix/status`, `kinetix/viz` and `kinetix/recon/points`, all transient-local and the last two only while subscribed.
 **Consequences.** Steady-state traffic ≈ 50 KB/s plus one lossless frame set per view. A `kinetix_msgs` package is built in the kinetix image.
 `goto` / `snapshot` carry no Kinetix types, so bisg can adopt them (`goto` = the contract's `offboard_controller`).
-interfaces.md §4/§5 change on acceptance. The latency and QoS assumptions are measured at K4 (ros-pipeline.md §8).
+interfaces.md §4/§5 change on acceptance. The latency and QoS assumptions are measured at K4 (acquisition/ros-pipeline.md §8).
 
 ## ADR-K10 — Pools carry real ZED SDK depth, rendered through the twin (2026-10-10, proposed)
 
@@ -112,10 +112,10 @@ sampler and the keep-out shell are object-centred (outside-in). A room is inside
 reconstruct, and obstacles (racks, carts) both block flight and are part of the surface.
 **Decision.** A scene declares `kind: object` (default, unchanged) or `kind: room`. In a room scene `roi` is the room's
 **inner** box: its walls, floor and ceiling (inward normals) plus the outer faces of the `no_fly` boxes are the surface proxy, and
-the `no_fly` boxes occlude it (`recon/coverage.py`, same triangulation rule as objects: two rays ≥ `tri_min_deg` apart).
-Candidates are a 4-DoF grid in the `workspace` (`planner/sampler.py` `GridSampler`). A candidate is only worth flying to if
+the `no_fly` boxes occlude it (`kinetix/coverage.py`, same triangulation rule as objects: two rays ≥ `tri_min_deg` apart).
+Candidates are a 4-DoF grid in the `workspace` (`acquisition/planner/sampler.py` `GridSampler`). A candidate is only worth flying to if
 at least `min_overlap` of what it sees is already seen, so every new image can register in SfM (connectivity, which an
-object orbit gets for free). Room-specific defaults live in `config/room.yaml`, layered automatically after `default.yaml` for room
+object orbit gets for free). Room-specific defaults live in `acquisition/config/room.yaml`, layered automatically after `default.yaml` for room
 scenes. The online model is still the GT-free coverage proxy; offline, `kinetix sfm` reconstructs the captured images with pycolmap
 (registration, ATE, completeness against the proxy surface). The MAVROS rig records each flight to an MCAP rosbag in the run dir.
 **Evidence (2026-10-17, Warehouse, T2).** Flight 1 (47 views planned with a 35° match limit and a 30 % overlap fraction, 351 m,
@@ -127,9 +127,9 @@ below 30° between the views, 0.15 at 30-45°, 0.04 at 60-90°, 0 beyond. So the
 shared-surface gate (`min_shared` 120 points) instead of a fraction, and offline SfM pairs images by co-visibility + the rig check.
 **Consequences.** The proxy is a box room: interior structure that is not a `no_fly` box (roof rafters, wall pillars) neither occludes
 nor counts. Repetitive interiors make pure SfM unreliable without the rig poses: the rig check uses EKF2 relative poses (Q5: the
-drone pose as a prior), so `pose_source: sfm` alone is not enough here. The paper claims C1–C5 (publication-plan.md) are written for objects; whether the room becomes the paper's target or
+drone pose as a prior), so `pose_source: sfm` alone is not enough here. The paper claims C1–C5 (paper/publication-plan.md) are written for objects; whether the room becomes the paper's target or
 a second scene class is open and does not change them yet. The K3 scorers (`sfm_uncertainty`, `depth_frontier`, `combo`) will need
-the same inside-out visibility, which `recon/coverage.py` now provides.
+the same inside-out visibility, which `kinetix/coverage.py` now provides.
 
 ## ADR-K12 — Rooms: plan the tour before take-off, fly it continuously, triangulate at the rig poses (2026-10-18, accepted)
 
@@ -140,7 +140,7 @@ grab: 5.2 s per view). Planning was 2 % (0.6 s per step). The long path also mad
 to process, flight time is not. SOTA fast aerial reconstruction plans a viewpoint set, orders it as a TSP and flies a continuous
 trajectory (PredRecon, Plan3D, FC-Planner); for repetitive interiors, SfM fails on visual aliasing (Doppelgangers++) and drifts on
 low-parallax video, and drone photogrammetry fuses the platform poses (GNSS/RTK priors).
-**Decision.** Method `tour` (`planner/tour.py`): greedy set cover of the room proxy to `planner.tour.coverage_target` (0.8)
+**Decision.** Method `tour` (`acquisition/planner/tour.py`): greedy set cover of the room proxy to `planner.tour.coverage_target` (0.8)
 without travel cost, an open TSP (nearest neighbour + 2-opt, metres + 1 m per radian of turn), a dense path, and `MavrosRig.fly_path`:
 a time-parameterised carrot at `cruise_mps` 1.0 with turns paced at `yaw_rate_deg_s`, keyframes every 0.4 m / 6° from the continuous
 left stream, no stopping. Offline (`kinetix sfm`): `video` pairing (10 sequential neighbours + 8 most co-visible frames, rig-checked)
@@ -165,13 +165,13 @@ needs a person to measure and type it in. The drone carries a stereo camera whos
 optical flow, and is the pose Kinetix flies and reconstructs on. The ZED's own spatial map lives in the ZED's tracking frame, which
 EKF2 corrects, so it is not the map to plan with (ADR-K07 keeps ZED mapping and odometry out of the method).
 **Decision.** `kinetix run --scene … --method tour --explore` (config `explore.*`):
-1. **Live map** (`recon/depthmap.py`): a voxel log-odds grid (0.2 m) fed with the ZED `depth_registered` image at the **rig pose**
+1. **Live map** (`acquisition/mapping/depthmap.py`): a voxel log-odds grid (0.2 m) fed with the ZED `depth_registered` image at the **rig pose**
    (EKF2 ∘ camera mount). Returns inside 8 m mark a voxel occupied and carve the ray free; a return farther out carves free space up to
    8 m and marks nothing. Map and flight path share one frame by construction. This is the fast, coarse tier.
-2. **Room fit** (`recon/roomfit.py`): walls, floor and ceiling are the outer voxel slices (plane position = centroid of the hits in
+2. **Room fit** (`acquisition/mapping/roomfit.py`): walls, floor and ceiling are the outer voxel slices (plane position = centroid of the hits in
    the outer slices, unbiased by depth noise), obstacles are 26-connected components inside the room (boxes; a floor-standing one is
    extended to the floor), workspace and altitude band are the room shrunk by the flight margins. Output is an ordinary `Scene`.
-3. **Exploration** (`planner/explore.py`): a yaw sweep, then frontier views: score reachable viewpoints by the frontier voxels in
+3. **Exploration** (`acquisition/planner/explore.py`): a yaw sweep, then frontier views: score reachable viewpoints by the frontier voxels in
    their cone, re-score the best few with a line-of-sight test, fly there. The drone parks only where it has seen the surroundings
    empty and flies only through known-free voxels, clear of occupied space by at least `planner.clearance_m` (the tour starts where
    exploration ends and boxes obstacles by that). Stop: every face seen to 60 %, or the fit unchanged for 4 steps with every face
@@ -217,7 +217,7 @@ there; an exploration plus a tour is 8+ minutes. **Guards added, whatever the ca
 (the run lands, `explore_incomplete`); a tour with no feasible viewpoint lands instead of raising. Depth registration is kept (dry
 model: residual drift 0.99 → 0.59 m, false obstacles 2 → 0 at 0.05 m/√m; never worse in six trials) but it is a partial correction, not
 a replacement for short flights or for a better pose.
-**NBV benchmark (2026-10-26, dry rig, no drift: `tests/nbv_bench.py`).** Four box rooms the planner never sees (12×9 m with 2 crates,
+**NBV benchmark (2026-10-26, dry rig, no drift: `acquisition/tests/nbv_bench.py`).** Four box rooms the planner never sees (12×9 m with 2 crates,
 a low 10×8×3.5 m room with 6 crates, 14×10 m split by a floor-to-ceiling partition, the Warehouse), two take-off points each. Every
 candidate the NBV scored is also flown in simulation (depth cast against the true room) and compared with the prediction; the whole
 exploration is run with the NBV, the cone score without line of sight, the nearest view, a random view and an oracle that picks by the

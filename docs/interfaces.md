@@ -11,13 +11,13 @@ pin it ([testing.md](testing.md)). Architecture context: [architecture.md](archi
 - Camera frame: **OpenCV optical** (x right, y down, z forward).
 - A pose is `T_map_cam`: camera → map. Stored as `{"p": [x, y, z], "q": [qx, qy, qz, qw]}`.
 - COLMAP stores world → camera (`cam_from_world`). The conversion happens **only** in
-  `recon/` and `offline/sfm.py` via `core.geometry`, nowhere else.
+  `acquisition/mapping/` and `reconstruction/sfm.py` via `kinetix.geometry`, nowhere else.
 - Drone vs camera: the rig converts a camera target into a body setpoint using the mount transform
   `T_base_cam` (read from TF on T2/T3; from config on T0/T1). The planner only ever reasons about
   camera poses.
 - Time: float seconds. In sim this is sim time (`use_sim_time`).
 
-## 2. Core types (`core/types.py`)
+## 2. Core types (`kinetix/types.py`)
 
 ```python
 @dataclass(frozen=True)
@@ -39,7 +39,7 @@ class Frame:
     K: Intrinsics
     target: Pose                   # what the planner asked for
     pose: Pose                     # what the rig reports (pool pose / EKF2 ∘ mount)
-    gt_pose: Pose | None           # sim only; never read by planner/recon (except pose_source=gt)
+    gt_pose: Pose | None           # sim only; never read by acquisition/ (except pose_source=gt)
     travel_m: float                # path length flown since the previous frame
     pool_id: str | None = None     # T0: id of the pool view
     right_image: Path | None = None  # only when the sensing mode needs it (stereo_rig*, stereo depth on T0/T1)
@@ -120,9 +120,9 @@ Errors: rigs raise `RigError(kind=...)` with kinds `unreachable | timeout | no_i
 The loop logs the error into `steps.jsonl`, marks the candidate infeasible for the rest of the
 session and continues. `aborted` (RC loss, operator) ends the session cleanly.
 
-## 4. ROS 2 interface (T2/T3: `rig/mavros.py`)
+## 4. ROS 2 interface (T2/T3: `acquisition/rig/mavros.py`)
 
-> Proposed replacement for §4 and §5: [ros-pipeline.md](ros-pipeline.md) (ADR-K09). Until it is accepted, this section is the contract.
+> Proposed replacement for §4 and §5: [acquisition/ros-pipeline.md](acquisition/ros-pipeline.md) (ADR-K09). Until it is accepted, this section is the contract.
 
 A strict subset of the bisg vehicle interface contract (`bisg_isaac/docs/interface-contract.md`),
 for drone `n` (default 1), namespace `/drone_<n>`:
@@ -169,7 +169,7 @@ The bisg contract names `bisg_vehicle/offboard_controller` as the setpoint produ
 is not built yet. Until it is, `MavrosRig` streams setpoints itself. Only one setpoint producer may
 run per drone. When bisg ships a `vehicle/cmd` goto, `MavrosRig` switches to it (decisions.md ADR-K01).
 
-## 5. T1 render server (`sim/render_server.py` ↔ `rig/isaac_render.py`)
+## 5. T1 render server (`sim/render_server.py` ↔ `acquisition/rig/isaac_render.py`)
 
 Runs inside `bisg/sim:6.0.0` with a Kinetix scene USD. No drone, no PX4: a free camera with the
 ZED Mini intrinsics from `pool.yaml` / config.
@@ -192,9 +192,9 @@ ZED Mini intrinsics from `pool.yaml` / config.
 ```
 kinetix check                                    # = scripts/check_env.py
 kinetix pool make  --scene S --layout rings:4x60|tammes:128 [--test-split 0.1]   # views.jsonl → T1 batch render
-kinetix run   --scene S --method M --sensing mono|stereo_plan|... --rig pool|isaac|mavros --seed K [key=value ...]  → runs/<id>/
-kinetix depth-study --scene S --sources stereo_learned,mono,gt [--zed]  → docs/research/depth-study.md data
-kinetix eval  runs/<id> [--densify gsplat|colmap_mvs]                  → runs/<id>/metrics.json
+kinetix run   --scene S --method M --sensing mono|stereo_plan|... --rig pool|isaac|mavros --seed K [key=value ...]  → data/<id>/
+kinetix depth-study --scene S --sources stereo_learned,mono,gt [--zed]  → docs/paper/research/depth-study.md data
+kinetix eval  data/<id> [--densify gsplat|colmap_mvs]                  → results/<id>/<method>/metrics.json
 kinetix bench --matrix config/bench/<name>.yaml [--jobs N]             → bench/<name>/report.md
 ```
 

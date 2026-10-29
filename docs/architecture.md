@@ -1,9 +1,9 @@
 # Kinetix architecture
 
-Status: **K1** (object demo loop and room capture run on the bisg twin; pools, ReconState and the K3 scorers are not built). Research framing: [research/idea.md](research/idea.md).
+Status: **K1** (object demo loop and room capture run on the bisg twin; pools, ReconState and the K3 scorers are not built). Research framing: [paper/research/idea.md](paper/research/idea.md).
 Related docs: [interfaces.md](interfaces.md) (APIs, ROS topics, frames), [data-format.md](data-format.md)
 (on-disk layouts), [roadmap.md](roadmap.md) (phases + exit tests), [testing.md](testing.md),
-[benchmark.md](benchmark.md), [decisions.md](decisions.md) (ADRs).
+[paper/benchmark.md](paper/benchmark.md), [decisions.md](decisions.md) (ADRs).
 
 ## 1. What Kinetix is
 
@@ -11,11 +11,11 @@ A closed loop that captures **few, well-chosen images** of one indoor object wit
 reconstructs the object with a standard photogrammetry pipeline (COLMAP-format SfM, then MVS or 3D
 Gaussian Splatting). The primary method is **monocular**. Because the drone carries a ZED Mini, the
 same loop also runs with **stereo** inputs as a measured comparison (§2a,
-[research/mono-vs-stereo.md](research/mono-vs-stereo.md)).
+[paper/research/mono-vs-stereo.md](paper/research/mono-vs-stereo.md)).
 
 A scene is either an **object** (cameras outside, around one ROI box) or a **room** (cameras inside; the room's walls, floor,
 ceiling and obstacles are the target; ADR-K11). Rooms use a separate capture method that plans the whole flight first and flies
-it without stopping (§5a, ADR-K12).
+it without stopping ([acquisition/architecture.md](acquisition/architecture.md) §5a, ADR-K12).
 
 ```
  seed views ──► capture ──► update online SfM ──► score candidate views ──► pick next view ──┐
@@ -24,7 +24,7 @@ it without stopping (§5a, ADR-K12).
  stop (budget / no gain) ──► offline: full SfM ──► densify ──► evaluate vs ground truth
 ```
 
-Design goals, in priority order (the paper contributions they serve are in [publication-plan.md](publication-plan.md)):
+Design goals, in priority order (the paper contributions they serve are in [paper/publication-plan.md](paper/publication-plan.md)):
 
 1. **One planner, four execution tiers.** The planning code is identical from an offline replay to
    the real drone; only the *rig adapter* changes (§3).
@@ -48,7 +48,7 @@ look identical to Kinetix (ADR-K01).
 │  planner loop ── rig adapter ──┬── PoolRig        (T0: offline replay)       │
 │       │                        ├── IsaacRenderRig (T1: render on demand) ─┐  │
 │       │                        └── MavrosRig      (T2 sim / T3 real) ──┐  │  │
-│  recon (pycolmap) · offline (densify, eval) · bench                    │  │  │
+│  mapping · reconstruction (sfm, densify, eval) · bench                 │  │  │
 │  sim/render_server.py  (runs inside the bisg/sim image) ◄──────────────┼──┘  │
 └────────────────────────────────────────────────────────────────────────┼─────┘
                        ROS 2 Jazzy, host network, /drone_1/...           │
@@ -103,213 +103,77 @@ becomes a real pool.
 
 ## 4. Module map
 
-Target layout (created incrementally per [roadmap.md](roadmap.md); built so far: `core/`, `rig/` dry + mavros, `recon/coverage.py` +
-`align.py`, `planner/` loop/nbv/tour/explore/sampler/constraints + scorers random/roi_coverage, `offline/sfm.py`, `cli.py`):
+Layout: three top-level packages, no `src/`. `kinetix/` is the small shared library, `acquisition/` (author A) and
+`reconstruction/` (author B) are the two areas ([collaboration.md](collaboration.md)); each keeps its tests in its own `tests/`.
+Target layout (created incrementally per [roadmap.md](roadmap.md); not built yet: `pool.py`, `isaac_render.py`, `state.py`,
+`depth/`, `seed.py`, `sequence.py`, most scorers, `external/`, `densify.py`, `metrics.py`, `evaluate.py`, `bench/`, `sim/`):
 
 ```
-src/kinetix/
-  core/        types.py       Pose, Intrinsics, Frame, Candidate, Scene, RunInfo (dataclasses)
-               geometry.py    SE3/Sim3, look-at, frame conversions (ENU map, OpenCV optical, COLMAP)
-               config.py      YAML layering + key=value overrides, named-component registry
-               runlog.py      run-directory writer/reader (data-format.md)
-  rig/         base.py        Rig protocol + RigCaps
-               pool.py        T0
-               isaac_render.py T1 client (ROS 2)
-               mavros.py      T2/T3 (ROS 2, bisg contract)
-  recon/       state.py       ReconState: online SfM over pycolmap (+ metric alignment)
-               align.py       Sim3 / Umeyama, ATE
-               depth/         DepthSource per frame: mono.py (DA-V2 anchored to SfM; `anchor: sfm | stereo | none`, `model: da_v2 | metric3d | depth_pro`)
-                              stereo_learned.py (FoundationStereo | SGBM) · stereo_zed.py (T2/T3 topic, or the pool's `zed/` depth on T0/T1) · gt.py
-  planner/     loop.py        the session entry point (§5): `run_session` picks the method's loop
-               nbv.py         stepwise NBV loop (roi_coverage, random, orbit): select (argmax of gain − λ·travel cost),
-                              stop rule (budget / coverage / gain plateau), orbit order
-               explore.py     unknown room: occupancy map from ZED depth, frontier views, room fit (§5b)
-               seed.py        initial views (e.g. 4-6 views on a ring around the ROI)
-               sampler.py     candidate poses (pool lookup | view sphere | ring stack | Tammes sphere | room grid)
-               tour.py        rooms: set cover, TSP order, dense path and the tour loop `run_tour` (method `tour`, §5a)
-               constraints.py workspace box, no-fly boxes, standoff, altitude, straight-line path check
-               sequence.py    fixed-sequence planners: orbit, grid (baselines)
-               scorers/       random · fvs · volumetric_ig · coverage_oracle · sfm_uncertainty · depth_frontier · combo
-               external/      wrappers for third-party pool baselines: fisherrf.py, ma_scvp.py (their code runs in
-                              its own env/container; the wrapper only exchanges candidate ids and scores)
-  offline/     sfm.py         final SfM over all captured frames (pycolmap; video/covis pairing, rig check, known-pose mode)
-               densify.py     backends: colmap_mvs (CUDA COLMAP container) | gsplat (+ TSDF mesh)
-               metrics.py     accuracy, completeness, Chamfer, F-score, ATE, PSNR/SSIM
-               evaluate.py    run dir → metrics.json
-  bench/       matrix.py      expand scenes × methods × budgets × seeds → runs
-               report.py      tables + efficiency curves from metrics.json files
-  cli.py       kinetix run | eval | bench | pool | check
-sim/
-  render_server.py            Isaac standalone script (bisg/sim image): pool batch mode + serve mode
-  scenes/                     scene build helpers (object USD + room → scene.usd, GT mesh export)
-config/        default.yaml, methods/*.yaml, rigs/*.yaml
-docker/        Dockerfile (ros:jazzy-ros-base + uv venv), compose.yaml
-tests/         unit/ component/ integration/ fixtures/
-scripts/       check_env.py
+kinetix/                         shared: both areas import it, it imports neither (cli.py excepted)
+  types.py       Pose, Intrinsics, Frame, Candidate, Scene, RunInfo (dataclasses)
+  geometry.py    SE3/Sim3, look-at, frame conversions (ENU map, OpenCV optical, COLMAP)
+  config.py      YAML layering + key=value overrides; ROOT, DATA, RESULTS, SCENES paths
+  runlog.py      run-directory writer/reader (data-format.md)
+  align.py       Sim3 / Umeyama, ATE
+  coverage.py    surface-coverage model (planner gain, reconstruction's completeness proxy)
+  cli.py         kinetix run | sfm (| eval | bench | pool | check)
+  scenes/        scene files (*.yaml): what acquisition flies, what reconstruction scores against
+  tests/
+acquisition/                     author A: decides where to fly and what to capture
+  planner/
+    loop.py        the session entry point (§5): `run_session` picks the method's loop
+    nbv.py         stepwise NBV loop (roi_coverage, random, orbit): select (argmax of gain − λ·travel cost),
+                   stop rule (budget / coverage / gain plateau), orbit order
+    explore.py     unknown room: occupancy map from ZED depth, frontier views, room fit (§5b)
+    tour.py        rooms: set cover, TSP order, dense path and the tour loop `run_tour` (method `tour`, §5a)
+    sampler.py     candidate poses (pool lookup | view sphere | ring stack | Tammes sphere | room grid)
+    constraints.py workspace box, no-fly boxes, standoff, altitude, straight-line path check
+    seed.py · sequence.py (orbit, grid baselines)
+    scorers/       random · roi_coverage · fvs · volumetric_ig · coverage_oracle · sfm_uncertainty · depth_frontier · combo
+    external/      wrappers for third-party pool baselines: fisherrf.py, ma_scvp.py (their code runs in its own env)
+  mapping/         online models: depthmap.py (occupancy), register.py (drift), roomfit.py, state.py (online SfM),
+                   depth/ (DepthSource per frame: mono / stereo_learned / stereo_zed / gt)
+  rig/             base.py (Rig protocol + RigCaps), dry.py + simdepth.py, mavros.py (T2/T3), pool.py (T0), isaac_render.py (T1)
+  config/          default.yaml, room.yaml (methods/*.yaml, rigs/*.yaml later)
+  tests/           unit tests + nbv_bench.py
+reconstruction/                  author B: turns a flight into a model and scores it
+  sfm.py         final SfM over all captured frames (pycolmap; video/covis pairing, rig check, known-pose mode)
+  densify.py     backends: colmap_mvs (CUDA COLMAP container) | gsplat (+ TSDF mesh)
+  metrics.py     accuracy, completeness, Chamfer, F-score, ATE, PSNR/SSIM
+  evaluate.py    run dir → metrics.json
+  tests/
+data/            flights, one run dir each (git-ignored, data-format.md §3); written by acquisition
+results/         results/<run>/<method>/ (git-ignored); written by reconstruction
+bench/           matrix.py (scenes × methods × budgets × seeds → runs), report.py (tables + efficiency curves)
+sim/             render_server.py (Isaac standalone, pool batch + serve mode), scene build helpers
+docker/          Dockerfile (ros:jazzy-ros-base), compose.yaml
+scripts/         check_env.py, room_scan.sh
 ```
 
-**Dependency rule** (enforced by a unit test that parses imports):
+**Dependency rule** (enforced by `kinetix/tests/test_boundaries.py`, which parses imports):
 
-```
-core  ◄── recon ◄── planner ◄── cli
-  ▲         ▲          │
-  │         └─ offline ◄── bench
-  └── rig (base.py only is imported by planner; adapters are loaded by name)
-```
-
-- `planner/` never imports `rclpy`, `rig.mavros`, `rig.isaac_render` or `offline/`.
-- Only `rig/mavros.py` and `rig/isaac_render.py` import `rclpy`, lazily. So T0 and every unit test
+- `kinetix/` imports neither area; only `kinetix/cli.py` dispatches to both.
+- `acquisition/planner/` never imports `rclpy`, `rig.mavros`, `rig.isaac_render` or `reconstruction/`.
+- Only `acquisition/rig/mavros.py` and `acquisition/rig/isaac_render.py` import `rclpy`, lazily. So T0 and every unit test
   run in the host venv with no ROS installed.
-- `offline/` reads run directories only. It never imports `planner/`, which keeps evaluation
+- `reconstruction/` reads run directories only. It never imports `acquisition/`, which keeps evaluation
   independent of the method under test.
 
-## 5. The session loop
+## 5–9. Acquisition and reconstruction
 
-```python
-def run_session(cfg, rig, recon, planner, log):
-    rig.start()                                   # T2/T3: arm, take off, OFFBOARD, go to standby pose
-    for pose in planner.seed(cfg.scene):          # a few views to bootstrap SfM
-        log.frame(frame := rig.capture_at(pose)); recon.add(frame)
-    while not planner.stop(recon, log.budget):
-        cands = planner.sample(cfg.scene, recon, rig.caps)          # list[Candidate]
-        cands = planner.constraints(cands, rig.pose(), cfg.scene)   # feasible + reachable only
-        gains = planner.scorer.score(cands, recon)                  # np.ndarray, one per candidate
-        pick  = planner.select(cands, gains, rig.pose())            # gain − λ·travel
-        log.step(cands, gains, pick)
-        log.frame(frame := rig.capture_at(pick.pose)); recon.add(frame)
-    rig.finish()                                  # T2/T3: return + land
-    log.close(recon)                              # write sfm/ snapshot, run.yaml summary
-```
-
-- **Stop-and-shoot** for objects and the NBV research loop: the rig flies to the pose, settles, then grabs one frame. Rooms
-  capture while moving (§5a).
-- **Baselines are configs.** `orbit` / `grid` use `sequence.py` (the planner returns the next pose
-  of a fixed list, no scorer); `random` uses the random scorer; `oracle` uses `coverage_oracle`
-  (sim only, reads GT, flagged `uses_gt: true` and reported as an upper bound).
-
-## 5a. Room capture: method `tour` (ADR-K11, ADR-K12)
-
-Rooms are large, so flight time dominates (stop-and-shoot NBV took 12-17 min of drone time in the Warehouse, 62 % of it in
-zig-zag travel, 38 % stopping); images are cheap. `tour` plans before take-off and never stops:
-
-1. **Viewpoints**: `GridSampler` (2 m grid × 3 heights × 12 yaws in the scene's `workspace`) → greedy set cover of the room proxy
-   (`recon/coverage.py`: room faces inward, obstacles occlude and count, triangulation needs two rays 8-20° apart) up to
-   `planner.tour.coverage_target` (0.8).
-2. **Order**: open TSP from the take-off pose (nearest neighbour + 2-opt; metres + `yaw_cost_m` per radian of turn).
-3. **Fly**: `rig.fly_path` streams a time-parameterised setpoint along the dense path at `rig.cruise_mps` (1.0) with turns paced
-   at `yaw_rate_deg_s`, and keeps a keyframe every 0.4 m / 6° of camera motion from the continuous left stream. The flight is
-   recorded to `<run>/rosbag/` (MCAP).
-4. **Reconstruct offline**: `kinetix sfm <run>` matches each keyframe with its 10 successors and its 8 most co-visible frames,
-   checks every verified pair against the rig's relative pose (repeated bays alias), triangulates at the rig (EKF2) poses and
-   refines with bundle adjustment (`pose_source: prior`). Pure incremental SfM (`--pose-source sfm`) put whole blocks of a
-   tour one 6 m bay off.
-
-2026-10-18 in the Warehouse: 2.0 min of drone time, 108 m, 403 keyframes; SfM 403/403, ATE 8.2 cm vs GT, 55 s of processing.
-The room box and obstacles come from the scene file, so this is coverage planning of a known room, not exploration.
-
-```
-METHOD=tour scripts/room_scan.sh all          # bisg sim up -> fly -> kinetix sfm (scripts/room_scan.sh sfm [RUN] re-runs SfM)
-```
-
-## 5b. Unknown rooms: explore, then tour (ADR-K13)
-
-`--explore` replaces the scene file's room box and obstacles with what the ZED depth shows, then runs `tour` on it, starting from
-what exploration already covered (every exploration view is a keyframe, so the tour plans only the gaps):
-
-```
-rig.capture_at -> depth (32FC1 m) + rig pose (EKF2 ∘ mount)
-   -> OccupancyMap.integrate     (recon/depthmap.py: occupied / free / unknown voxels, 0.2 m)
-   -> fit_scene                  (recon/roomfit.py: walls, floor, ceiling, obstacle boxes -> Scene)
-   -> next_view                  (planner/explore.py: frontier voxels + the fitted room's unseen faces / obstacle sides (face_targets)
-                                  in the view cone, line-of-sight re-score, safe parking + corridor)
-   -> ... until the room is closed or stable -> run_tour on the fitted Scene, the exploration views credited to its coverage
-```
-Exploration views go to `frames.jsonl` (idx 900000+, `pool_id` `explore_<n>`, EKF2 pose) like tour keyframes, so `kinetix sfm` uses
-them. `explore.reuse_views=false` is the traditional baseline for benchmarking (exploration only maps, the tour scans the whole
-room, no exploration frames in `frames.jsonl`): `kinetix run --scene ... --method tour --explore explore.reuse_views=false`; `run.yaml`
-records which arm a run was; the run dir is named `..._tour-explore-optimized_...` / `..._tour-explore-traditional_...`. Warehouse,
-dry rig: reuse 17 viewpoints / 80 m, traditional 24 / 90 m. Room fit (recon/roomfit.py): floor and ceiling first, then each wall
-from the occupied voxels between them, placed on the densest slice within `fit.wall_artifact_m` inward of the outermost one (a
-weaker sheet beyond it is that wall mapped again after pose drift: fitting to it left the real wall inside the room as an obstacle).
-Outputs in `<run>/explore/`: `scene.yaml` (the fitted room in scene-file format), `occupancy.npz`, `steps.jsonl` (one record per view:
-faces seen, known fraction, frontier, target) and `report.json` (with `vs_truth` when a scene file is given). `steps.jsonl` of the
-run itself still starts with the tour plan. Dry rig: `core/simdepth.py` ray-casts depth against a true scene the planner never
-sees. Config: `explore.*` in `config/default.yaml`. From the GCS: the Kinetix tab's "explore it first" box.
-
-## 6. Online reconstruction (`recon/state.py`)
-
-`ReconState` wraps a pycolmap database + `Reconstruction` and answers what the scorers need: the
-registered images, sparse points with track length, triangulation angle and reprojection error,
-and the observed-surface bounding box.
-
-- **v1 (simple):** on every new frame, extract features, match the new image against all previous
-  ones (exhaustive; N ≤ ~150), and re-run incremental mapping. That is a few seconds per step at
-  these sizes, and correct by construction.
-- **v2 (fast, K5):** `pycolmap.IncrementalMapper` registering only the next image, plus local BA.
-- **Metric frame.** Monocular SfM is up to scale. After each update the model is Sim3-aligned to the
-  rig poses (`align_reconstructions_via_proj_centers` / Umeyama on camera centres), so scorers,
-  constraints and the planner all work in the metric `map` frame.
-- **Pose source** (`recon.pose_source`, an ablation axis): `sfm` (pure SfM, aligned after),
-  `prior` (rig poses as priors / known-pose triangulation), `gt` (oracle, sim only).
-- **Stereo rig** (`sensing.recon_input: stereo_rig*`): the right image is added as a second camera of a
-  pycolmap `Rig` with the baseline from `camera_info`. SfM is then metric without any pose prior.
-
-## 7. Next-best-view scoring
-
-Every scorer has the same signature, `score(cands, recon) -> gains`. The research contribution is the
-`combo` scorer and its components:
-
-| Scorer | Signal | Needs | Role |
-|---|---|---|---|
-| `random` | — | — | baseline |
-| `fvs` | distance to the farthest already-captured view (farthest-view sampling) | poses only | strong simple baseline |
-| `volumetric_ig` | entropy of unobserved / rear-side voxels in the TSDF visible from the candidate (Isler/Delmerico family) | a depth source | classical NBV baseline |
-| `fisherrf`, `ma_scvp` (external) | 3DGS Fisher information; learned one-shot + NBV view planning | their own code | radiance-field and learned baselines |
-| `coverage_oracle` | unseen GT-surface area visible from the candidate (Open3D raycast on the GT mesh) | GT mesh | upper bound, sim only |
-| `sfm_uncertainty` | sparse points visible in the candidate, weighted by poor triangulation angle, short track or high reprojection error; plus angular gaps in the view distribution around the ROI | sparse model | core monocular signal |
-| `depth_frontier` | per-frame depth from the configured `DepthSource` (`sensing.plan_depth`: mono / stereo / gt), fused into a coarse TSDF in the ROI; gain = unknown/frontier voxels visible from the candidate | a depth source | completeness signal. The same scorer serves mono and stereo, so the comparison changes only the depth |
-| `combo` | weighted sum of `sfm_uncertainty` and `depth_frontier` (weights in config) | | Kinetix method (C1) |
-
-`select` maximises `gain − λ · travel_cost(current → candidate)`, where travel cost is the
-straight-line distance, plus a yaw-change term. Candidates are generated **inside the camera's
-reachable pose space** (§8), so the planner never proposes a view the drone cannot take.
-
-## 8. Indoor and vehicle constraints
-
-- **Camera DoF.** The ZED Mini is rigidly mounted (bisg: forward-looking, pitch 0°), so a camera
-  pose is **4-DoF** (x, y, z, yaw) with pitch fixed by the mount. Samplers, pools and T1 all read
-  `camera.mount_pitch_deg`. A pitched-down mount (needed to see top surfaces) is open question Q1.
-- **Scene file** (per object, [data-format.md](data-format.md)): `roi` box around the object,
-  `workspace` box (room minus margin), `no_fly` boxes, `standoff` [min, max] from the ROI and
-  `altitude` [min, max].
-- **Feasibility** (`constraints.py`): the pose is inside the workspace and outside the no-fly boxes and
-  the ROI standoff shell, *and* the straight segment from the current pose clears all boxes. v1 has
-  no general path planner. If a segment is blocked, the candidate is dropped.
-- **Lighting/texture adaptation** (exposure control, avoiding specular angles) is K5 scope.
-
-## 9. Offline pipeline (identical for every method)
-
-To keep the comparison fair, the online model is only for planning. Every method's final model is
-rebuilt the same way from its captured frames alone:
-
-1. `offline/sfm.py`: pycolmap SfM over all frames (`sfm` or `prior` poses; rig SfM when
-   `recon_input` is stereo).
-2. Sim3-align to GT camera centres (sim) or to the rig poses (real).
-3. `offline/densify.py`: `colmap_mvs` (CUDA COLMAP in Docker: the pip pycolmap wheel is CPU-only)
-   or `gsplat` (3DGS, then TSDF-fused rendered depth → mesh), or `tsdf_depth` (stereo modes only:
-   TSDF fusion of the stored stereo depth at SfM poses).
-4. `offline/evaluate.py`: crop to the ROI, compare with the **observable** GT surface, write
-   `metrics.json` ([benchmark.md](benchmark.md) §3).
+The session loop (§5), room capture with `tour` (§5a), exploration of unknown rooms (§5b), online reconstruction (§6), NBV scoring
+(§7) and the indoor constraints (§8) are in [acquisition/architecture.md](acquisition/architecture.md), under the same section
+numbers. The offline pipeline (§9) is [reconstruction/pipeline.md](reconstruction/pipeline.md).
 
 ## 10. Configuration
 
 One YAML per run, resolved from layers and stored verbatim in the run directory:
 
 ```
-config/default.yaml  <  config/rigs/<tier>.yaml  <  config/methods/<method>.yaml  <  data/scenes/<scene>/scene.yaml  <  CLI key=value
+acquisition/config/default.yaml  <  acquisition/config/rigs/<tier>.yaml  <  acquisition/config/methods/<method>.yaml  <  data/scenes/<scene>/scene.yaml  <  CLI key=value
 ```
 
-Components are chosen by name (`planner.scorer: combo`, `rig: pool`, `offline.densify: gsplat`).
+Components are chosen by name (`planner.scorer: combo`, `rig: pool`, `reconstruction.densify: gsplat`).
 Each key lives in exactly one default layer. Machine-specific paths (data root, GPU index) go in
 `.env` (git-ignored), never in YAML.
 
@@ -317,7 +181,7 @@ Each key lives in exactly one default layer. Machine-specific paths (data root, 
 
 | Piece | Runs in | Why |
 |---|---|---|
-| planner + recon + offline + bench, T0 | host venv (`uv`) or the kinetix image | no ROS needed |
+| acquisition + reconstruction + bench, T0 | host venv (`uv`) or the kinetix image | no ROS needed |
 | T1/T2/T3 sessions | `kinetix` image: `ros:jazzy-ros-base` + the same uv venv (`--system-site-packages` for `rclpy`; Jazzy is Python 3.12 like the host) | needs `rclpy` |
 | `sim/render_server.py` | `bisg/sim:6.0.0` (Isaac's Python) | needs Isaac |
 | sim + PX4 + MAVROS | bisg_isaac compose (`./bisg all headless`) | platform |

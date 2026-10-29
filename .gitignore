@@ -4,8 +4,9 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .ruff_cache/
-runs/
-data/cache/
+# flights (run dirs, written by acquisition) and results/<run>/<method>/ (written by reconstruction)
+data/
+results/
 .env
 # flight recordings (MavrosRig rig.bag, ADR-K11): kept locally for replay, never in git
 rosbag/

@@ -4,13 +4,13 @@
 #   scripts/room_scan.sh [all] [OPTIONS]  sim + fly + reconstruct (everything)
 #   scripts/room_scan.sh sim [--gui]      start the bisg sim only (headless), wait until ready
 #   scripts/room_scan.sh fly [OPTIONS]    fly the capture against a running sim
-#   scripts/room_scan.sh sfm [RUN]        reconstruct a run offline (default: the newest run in runs/; also --run RUN)
+#   scripts/room_scan.sh sfm [RUN]        reconstruct a run offline (default: the newest run in data/; also --run RUN)
 #   scripts/room_scan.sh stop             stop the bisg sim
 #
 # Options: --tour             planned continuous tour, ~5 min wall (ADR-K12)
 #          --roi              stop-and-shoot NBV, ~25 min wall (default)
 #          --method M         any kinetix method name        --seed N   (default 0)
-#          --scene FILE       (default config/scenes/warehouse_room.yaml)
+#          --scene FILE       (default kinetix/scenes/warehouse_room.yaml)
 #          --gui              sim with a window instead of headless
 # e.g. `room_scan.sh fly --tour`, `room_scan.sh --tour --seed 3`. Env METHOD, SEED, SCENE, GUI=1 still set the defaults.
 # Env: BISG_DIR (default: the bisg_isaac checkout next to this repo, else ~/Documents/bisg_isaac).
@@ -18,7 +18,7 @@ set -euo pipefail
 
 KX="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BISG_DIR="${BISG_DIR:-$(cd "$KX/../bisg_isaac" 2>/dev/null && pwd -P || echo "$HOME/Documents/bisg_isaac")}"   # sibling checkout first
-SCENE="${SCENE:-config/scenes/warehouse_room.yaml}"
+SCENE="${SCENE:-kinetix/scenes/warehouse_room.yaml}"
 METHOD="${METHOD:-roi_coverage}"
 SEED="${SEED:-0}"
 GUI="${GUI:-0}"
@@ -47,7 +47,7 @@ MODE="$([[ "$GUI" == 1 ]] && echo gui || echo headless)"
 
 kx(){ (cd "$KX" && docker compose --env-file .env -f docker/compose.yaml run --rm kinetix "$@"); }
 
-latest_run(){ ls -dt "$KX"/runs/*/ 2>/dev/null | head -1 | sed 's:/$::'; }
+latest_run(){ ls -dt "$KX"/data/*/ 2>/dev/null | head -1 | sed 's:/$::'; }
 
 check(){
   [[ -x "$BISG_DIR/bisg" ]] || die "bisg_isaac not found at $BISG_DIR (set BISG_DIR)"
@@ -79,11 +79,11 @@ fly(){
 
 sfm(){
   local run="${1:-$(latest_run)}"
-  [[ -n "$run" ]] || die "no run in $KX/runs; fly first"
+  [[ -n "$run" ]] || die "no run in $KX/data; fly first"
   [[ "$run" = /* ]] || run="$KX/$run"
   say "reconstructing $(basename "$run")"
-  kx python3 -m kinetix sfm "runs/$(basename "$run")"
-  say "result: $run/sfm/offline/  (points.ply, metrics.json)"
+  kx python3 -m kinetix sfm "data/$(basename "$run")"
+  say "result: $KX/results/$(basename "$run")/sfm/  (points.ply, metrics.json)"
 }
 
 case "$CMD" in

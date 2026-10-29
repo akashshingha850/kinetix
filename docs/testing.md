@@ -7,10 +7,10 @@ needs the infrastructure of a higher one. pytest markers are declared in `pyproj
 |---|---|---|---|---|
 | Unit | (none) | host venv | < 30 s total | every change |
 | Component | `t0` | host venv + `tests/fixtures/` | < 2 min | every change |
-| Render integration | `t1` | `bisg/sim:6.0.0`, GPU | ~5 min | changes to `sim/` or `rig/isaac_render.py` |
-| Flight integration | `t2` | bisg stack `./bisg all headless` | ~15 min | changes to `rig/mavros.py`, before a hardware session |
+| Render integration | `t1` | `bisg/sim:6.0.0`, GPU | ~5 min | changes to `sim/` or `acquisition/rig/isaac_render.py` |
+| Flight integration | `t2` | bisg stack `./bisg all headless` | ~15 min | changes to `acquisition/rig/mavros.py`, before a hardware session |
 | Hardware bench | `t3` | real drone, tether | manual checklist | before every flight day |
-| Bench regression | — | pools on `$KINETIX_DATA` | ~10 min | before merging planner/recon/offline changes |
+| Bench regression | — | pools on `$KINETIX_DATA` | ~10 min | before merging acquisition/ or reconstruction/ changes |
 
 ```bash
 uv run pytest                                  # unit + t0 (default: excludes t1/t2/t3 via addopts, K1)
@@ -19,24 +19,24 @@ uv run pytest -m t2                            # flight integration (sim must be
 uv run kinetix bench --matrix config/bench/smoke.yaml --check   # bench regression vs golden
 ```
 
-## 1. Unit tests (`tests/unit/`): pure functions, no I/O beyond tmp dirs
+## 1. Unit tests (`kinetix/tests/`, `acquisition/tests/`, `reconstruction/tests/`): pure functions, no I/O beyond tmp dirs
 
 | Module | What is pinned |
 |---|---|
-| `core.geometry` | SE3 compose/inverse round-trip, quaternion normalisation, look-at, ENU ↔ optical ↔ COLMAP `cam_from_world` ↔ OpenGL (nerfstudio) round-trips, 4-DoF pose with a fixed mount pitch |
-| `core.config` | layering order, `key=value` override types, unknown key → error, registry lookup by name |
-| `core.runlog` | write → read round-trip, unknown keys ignored, `format` version check |
-| `recon.align` | Sim3/Umeyama recovers a random transform from noisy correspondences (≤ 1e-6 noise-free) |
+| `kinetix.geometry` | SE3 compose/inverse round-trip, quaternion normalisation, look-at, ENU ↔ optical ↔ COLMAP `cam_from_world` ↔ OpenGL (nerfstudio) round-trips, 4-DoF pose with a fixed mount pitch |
+| `kinetix.config` | layering order, `key=value` override types, unknown key → error, registry lookup by name |
+| `kinetix.runlog` | write → read round-trip, unknown keys ignored, `format` version check |
+| `kinetix.align` | Sim3/Umeyama recovers a random transform from noisy correspondences (≤ 1e-6 noise-free) |
 | `planner.sampler` | all samples within standoff/altitude, pitch = mount pitch, yaw points at the ROI |
 | `planner.constraints` | boxes, standoff shell, segment-vs-box intersection on hand-made cases |
 | `planner.select` | λ = 0 → argmax gain. Big λ → nearest. Ties broken by seed. |
 | `planner.sampler` (Tammes) | 128 points, near-uniform minimum angular spacing. Reachability mask drops views below the floor or in no-fly boxes |
 | `scorers.fvs` | picks the view farthest from all captured views. Deterministic |
-| `offline.metrics` (N@q, AUC, Kendall) | N@q interpolation on a synthetic curve, and NaN when q·F_ref is never reached. AUC of a step curve. Kendall's τ = 1 for identical rankings and −1 for reversed |
+| `reconstruction.metrics` (N@q, AUC, Kendall) | N@q interpolation on a synthetic curve, and NaN when q·F_ref is never reached. AUC of a step curve. Kendall's τ = 1 for identical rankings and −1 for reversed |
 | `planner.scorers.*` | on synthetic `ReconState` fakes: a view of only well-triangulated points scores below a view of a gap. Random scorer is seed-deterministic. |
-| `offline.metrics` | identical clouds → 0 / F = 1. Sphere offset by d → Chamfer d. Empty recon → completeness = 0, no crash. |
-| architecture | import rule (architecture.md §4): `planner/` and `core/` import no `rclpy` / adapter / `offline` (AST scan) |
-| topic whitelist | for each sensing preset, `rig/mavros.py`'s subscription list equals the whitelist (interfaces.md §4). `mono` has no right/depth topic. No mode has point_cloud/mapping/odom |
+| `reconstruction.metrics` | identical clouds → 0 / F = 1. Sphere offset by d → Chamfer d. Empty recon → completeness = 0, no crash. |
+| architecture | import rule (architecture.md §4, `kinetix/tests/test_boundaries.py`): neither area imports the other, `kinetix/` imports neither, planner + mapping import no `rclpy` / adapter (AST scan) |
+| topic whitelist | for each sensing preset, `acquisition/rig/mavros.py`'s subscription list equals the whitelist (interfaces.md §4). `mono` has no right/depth topic. No mode has point_cloud/mapping/odom |
 | sensing config | preset → (plan_depth, recon_input) resolution. `uses_gt` is true when the depth source is `gt` |
 | `recon.depth.mono` | scale fit recovers a known scale from synthetic depth + sparse points |
 
@@ -75,7 +75,7 @@ explains why.
 
 ## 5. Hardware bench checklist (T3, K6)
 
-Before any untethered flight; the results go into `runs/<id>/log.txt` of a dry run:
+Before any untethered flight; the results go into `data/<id>/log.txt` of a dry run:
 
 1. bisg `./bisg zed check --no-gt` passes on the drone (camera stream, geometry).
 2. `camera_info` resolution equals the config, and `K` is the unit's factory calibration (not the sim's).

@@ -36,7 +36,7 @@ Extras planned per phase (installed when the phase starts, not before):
 ```bash
 KINETIX_DATA=/home/akashshingha/kinetix-data   # scenes, pools, runs, bench (outside the repo)
 BISG_DIR=/home/akashshingha/bisg_isaac
-CUDA_VISIBLE_DEVICES=1                          # planner/densify GPU; Isaac uses GPU 0
+CUDA_VISIBLE_DEVICES=1                          # densify / training GPU; Isaac uses GPU 0
 ROS_DOMAIN_ID=0                                 # must match the bisg stack
 ```
 

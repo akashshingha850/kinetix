@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && pip install --no-cache-dir --break-system-packages pycolmap==4.2.1
 
 ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
-    PYTHONPATH=/kinetix/src \
+    PYTHONPATH=/kinetix \
     PYTHONUNBUFFERED=1 \
     ROS_LOG_DIR=/tmp/ros_log \
     HOME=/tmp

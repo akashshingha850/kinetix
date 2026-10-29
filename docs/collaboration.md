@@ -2,39 +2,55 @@
 
 Two authors, two areas, one contract. Acquisition decides **which images are taken** (explore, view and path planning, image count).
 Reconstruction decides **what is made from them** (SfM, MVS, 3DGS, depth fusion, evaluation). They meet only at the run directory
-([data-format.md](data-format.md) §3), which architecture.md §4 already enforces: `offline/` reads run directories and never imports `planner/`.
+([data-format.md](data-format.md) §3) and share the small `kinetix/` library. `kinetix/tests/test_boundaries.py` enforces it: neither area
+imports the other, and `kinetix/` imports neither.
+
+## Folder tree
+
+```
+kinetix/              shared library (types, geometry, config, runlog, align, coverage, cli) + scenes/ + tests/
+acquisition/          author A: planner/  mapping/  rig/  config/  tests/
+reconstruction/       author B: sfm.py (densify.py, ...)  tests/
+data/<run>/           flights, git-ignored: acquisition writes, reconstruction reads
+results/<run>/<m>/    outputs, git-ignored: reconstruction writes, one folder per method
+docs/                 shared docs at the top (architecture, data-format, interfaces, decisions, roadmap, setup, testing)
+  acquisition/        architecture.md (loop, tour, explore, NBV), ros-pipeline.md, todo.md
+  reconstruction/     pipeline.md, todo.md
+  paper/              publication-plan.md, benchmark.md, research/
+docker/  scripts/
+```
 
 ## Who owns what
 
 | Area | Owner | Paths | Todo |
 |---|---|---|---|
-| Acquisition | author A | `src/kinetix/planner/`, `src/kinetix/rig/`, `src/kinetix/recon/` (online models: coverage, depthmap, roomfit, register), `config/`, `tests/nbv_bench.py`, `tests/unit/` (existing), `scripts/room_scan.sh` (fly part) | [todo.md](todo.md) |
-| Reconstruction | author B | `src/kinetix/offline/` (one module per method: `sfm.py`, `densify.py`, `gsplat.py`, `eval.py`, ...), `tests/unit/test_offline_*.py` | [todo-reconstruction.md](todo-reconstruction.md) |
-| Shared, change by PR with both reviewing | both | `src/kinetix/core/`, `src/kinetix/recon/align.py`, `src/kinetix/cli.py`, [data-format.md](data-format.md), [interfaces.md](interfaces.md), [publication-plan.md](publication-plan.md), `pyproject.toml` / `uv.lock`, `docker/` | — |
+| Acquisition | author A | `acquisition/` (planner, online mapping, rig, config, tests incl. `nbv_bench.py`), `data/`, `scripts/room_scan.sh` (fly part) | [acquisition/todo.md](acquisition/todo.md) |
+| Reconstruction | author B | `reconstruction/` (one module per method: `sfm.py`, `densify.py`, `gsplat.py`, `eval.py`, ..., tests in `reconstruction/tests/`), `results/` | [reconstruction/todo.md](reconstruction/todo.md) |
+| Shared, change by PR with both reviewing | both | `kinetix/` (incl. `scenes/`), [data-format.md](data-format.md), [interfaces.md](interfaces.md), [paper/publication-plan.md](paper/publication-plan.md), `pyproject.toml` / `uv.lock`, `docker/` | — |
 
-`offline/sfm.py` uses `recon/coverage.py` for the completeness proxy: a coverage change on the acquisition side must keep
+`kinetix/coverage.py` is shared because both sides use it (planner gain, `reconstruction/sfm.py`'s completeness proxy): a change must keep
 `CoverageState.for_scene` and `box_surface` working, or say so in the PR.
 
 ## The contract: a run directory
 
-- Acquisition **writes** `runs/<run>/`: `run.yaml`, `frames.jsonl`, `frames/`, `depth/`, `steps.jsonl`, `explore/`, `rosbag/`.
-- Reconstruction **reads** those and writes only into its own subfolder: `runs/<run>/sfm/offline/` today, and one folder per new method
-  (`runs/<run>/<method>/`, with a `metrics.json`). It never edits the acquisition files.
+- Acquisition **writes** `data/<run>/`: `run.yaml`, `frames.jsonl`, `frames/`, `depth/`, `steps.jsonl`, `explore/`, `rosbag/`.
+- Reconstruction **reads** those and writes only to `results/<run>/<method>/` (`sfm/` today, with a `metrics.json`). It never writes
+  into `data/`.
 - A new field in `frames.jsonl` or `run.yaml` goes into data-format.md §3 first (CLAUDE.md rule), in a small PR to `main`.
 
 ## Shared data
 
-`runs/` is git-ignored (GBs per flight), so the flights are shared outside git:
+`data/` is git-ignored (GBs per flight), so the flights are shared outside git:
 
 - **Frozen benchmark runs.** Reconstruction is compared on a fixed set of flights, so new acquisition work cannot shift its results.
   Start with `20261028-163032_warehouse_room_tour-explore-optimized_mavros_s0`. Add runs to the list here, never edit a listed run.
-- Copy them to shared storage (`$KINETIX_DATA/runs/`, or rsync between the two workstations). Copy without `rosbag/` unless needed:
-  `rsync -a --exclude rosbag runs/<run> <host>:<path>/runs/`.
+- Copy them to shared storage (`$KINETIX_DATA/data/`, or rsync between the two workstations). Copy without `rosbag/` unless needed:
+  `rsync -a --exclude rosbag data/<run> <host>:<path>/data/`.
 - Acquisition reports a new method on its own new flights, then hands the run IDs over for reconstruction.
 
 | Frozen run | Method | Keyframes | Notes |
 |---|---|---|---|
-| `20261028-163032_warehouse_room_tour-explore-optimized_mavros_s0` | tour + explore (optimized) | 267 | Warehouse; explore view 900004 has 7 points (BA bug, todo-reconstruction.md) |
+| `20261028-163032_warehouse_room_tour-explore-optimized_mavros_s0` | tour + explore (optimized) | 267 | Warehouse; explore view 900004 has 7 points (BA bug, reconstruction/todo.md) |
 
 ## Branches
 

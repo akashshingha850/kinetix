@@ -10,7 +10,7 @@ small test fixtures live in the repo (`tests/fixtures/`, git-lfs).
 $KINETIX_DATA/
   scenes/<scene>/          one object in one room          (§1)
   pools/<scene>/<pool>/    pre-rendered candidate views    (§2)
-  runs/<run_id>/           one session                     (§3)
+  data/<run_id>/           one session                     (§3)
   bench/<matrix>/          one benchmark                   (§4)
 ```
 
@@ -38,7 +38,7 @@ gt_mesh: gt_mesh.ply
 
 **Room scenes** (`kind: room`, ADR-K11): the whole room is the target. `roi` is the room's inner box (walls, floor, ceiling =
 the surface), `no_fly` boxes are obstacles that block flight, occlude and are surface too, `workspace` is where the camera may be,
-`standoff_m` is unused. Example `config/scenes/warehouse_room.yaml`:
+`standoff_m` is unused. Example `kinetix/scenes/warehouse_room.yaml`:
 
 ```yaml
 name: warehouse_room
@@ -82,7 +82,7 @@ splits: {candidate: 216, test: 24}
 the 4-DoF mount constraint). They are kept so the pool stays comparable to sphere-based benchmarks, but they are never
 selectable. `test` views are never selectable either. They are held out for novel-view metrics (PSNR/SSIM) on 3DGS outputs.
 
-## 3. Run — `runs/<run_id>/`
+## 3. Run — `data/<run_id>/`
 
 `run_id = <YYYYmmdd-HHMMSS>_<scene>_<method>_<rig>_s<seed>`.
 
@@ -94,12 +94,16 @@ frames/<idx>.png   captured left images (T0: hard links into the pool)
 frames/<idx>_R.png right images (stereo_rig* modes only)
 depth/<idx>.npy    depth used for planning (+ <idx>_conf.npy), when plan_depth ≠ none; or, with `rig.save_depth` (room scenes), the ZED
                    depth_registered of every captured frame (float32 m, NaN = no return), `frames.jsonl` `depth` + `depth_source: zed`
-sfm/online/        final online model (COLMAP binary)
-sfm/offline/       offline SfM over all frames (`kinetix sfm`: database.db, pairs.txt, sparse/<k>/, points.ply in map, metrics.json)
+sfm/online/        final online model (COLMAP binary, acquisition's online SfM)
 rosbag/            MCAP recording of the flight (T2/T3, `rig.bag`; topics in interfaces.md §4). Large; never in git
-recon/             dense.ply | mesh.ply | gs/ (per densifier)
-metrics.json       written by `kinetix eval`
 log.txt            human log
+```
+
+Acquisition writes `data/<run_id>/`; reconstruction only reads it and writes `results/<run_id>/<method>/`:
+
+```
+results/<run_id>/sfm/       offline SfM over all frames (`kinetix sfm`: database.db, pairs.txt, sparse/<k>/, points.ply in map, metrics.json)
+results/<run_id>/<method>/  dense.ply | mesh.ply | gs/ (per densifier) + metrics.json (`kinetix eval`)
 ```
 
 ```yaml
@@ -150,4 +154,4 @@ report.md          tables + efficiency curves (figures/*.png)
 
 - COLMAP: `sfm/*` is already COLMAP binary, and `frames/` is the image folder.
 - nerfstudio / gsplat: `kinetix export <run> --format nerfstudio` writes `transforms.json` (OpenGL
-  camera convention: the conversion lives in `core.geometry`).
+  camera convention: the conversion lives in `kinetix.geometry`).
