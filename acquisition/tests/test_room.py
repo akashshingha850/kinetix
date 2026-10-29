@@ -85,6 +85,14 @@ def test_grid_candidates_fill_the_workspace_and_room_constraints_skip_the_roi_sh
     assert near_crate.any() and not feas[near_crate].any()                    # no-fly box + clearance
 
 
+def test_grid_heights_outside_the_workspace_are_clipped_not_dropped():
+    cands = grid_poses(SCENE, CAPS, 1.0, [0.7, 2.0, 3.3], 4)                  # workspace z 0.8..3.2, altitude 0.9..3.0
+    z = np.array([c.pose.p[2] for c in cands])
+    assert sorted(set(np.round(z, 3))) == [0.9, 2.0, 3.0]
+    feas = BoxConstraints(0.5, 0.45).feasible(cands, camera_pose(SCENE.standby, 0.0), SCENE)
+    assert feas[np.isclose(z, 0.9)].any() and feas[np.isclose(z, 3.0)].any()  # the clipped layers can be flown
+
+
 def test_umeyama_recovers_a_sim3():
     rng = np.random.default_rng(0)
     X = rng.normal(size=(20, 3))
