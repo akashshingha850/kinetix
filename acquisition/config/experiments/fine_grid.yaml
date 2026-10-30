@@ -1,0 +1,7 @@
+# Denser viewpoint candidates: xy grid 1.5 m (default 2.0) and camera layers <= 1.2 m apart (default 1.6). Hypothesis: a better
+# set cover (fewer, better-placed viewpoints) for more planning time.
+experiment: fine_grid
+planner:
+  grid:
+    spacing_m: 1.5
+    layer_m: 1.2

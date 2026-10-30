@@ -134,7 +134,8 @@ acquisition/                     author A: decides where to fly and what to capt
   mapping/         online models: depthmap.py (occupancy), register.py (drift), roomfit.py, state.py (online SfM),
                    depth/ (DepthSource per frame: mono / stereo_learned / stereo_zed / gt)
   rig/             base.py (Rig protocol + RigCaps), dry.py + simdepth.py, mavros.py (T2/T3), pool.py (T0), isaac_render.py (T1)
-  config/          default.yaml, room.yaml (methods/*.yaml, rigs/*.yaml later)
+  config/          common.yaml, object.yaml | room.yaml (by scene kind), experiments/*.yaml (--config overlays)
+  compare.py       runs side by side by their SfM result + the config keys that differ
   tests/           unit tests + nbv_bench.py
 reconstruction/                  author B: turns a flight into a model and scores it
   sfm.py         final SfM over all captured frames (pycolmap; video/covis pairing, rig check, known-pose mode)
@@ -169,7 +170,7 @@ numbers. The offline pipeline (§9) is [reconstruction/pipeline.md](reconstructi
 One YAML per run, resolved from layers and stored verbatim in the run directory:
 
 ```
-acquisition/config/default.yaml  <  acquisition/config/rigs/<tier>.yaml  <  acquisition/config/methods/<method>.yaml  <  data/scenes/<scene>/scene.yaml  <  CLI key=value
+acquisition/config/common.yaml  <  object.yaml | room.yaml (scene kind)  <  --config files (experiments/*.yaml)  <  CLI key=value
 ```
 
 Components are chosen by name (`planner.scorer: combo`, `rig: pool`, `reconstruction.densify: gsplat`).

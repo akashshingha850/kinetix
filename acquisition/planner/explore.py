@@ -34,11 +34,12 @@ from kinetix.types import Box, Intrinsics, Pose, RigError, Scene
 IDX0 = 900000                       # exploration images are numbered apart from the tour's keyframes (frames/NNNNNN.png)
 
 
-def hint_scene(truth: Scene, volume) -> Scene:
-    """What the planner and the rig get in exploration mode: the take-off point and altitude band of a scene file, and a search
-    volume where its room and obstacles were. No room geometry, no obstacles."""
+def hint_scene(truth: Scene, volume, band=None) -> Scene:
+    """What the planner and the rig get in exploration mode: the take-off point, an altitude band (`band`, else the scene file's)
+    and a search volume where its room and obstacles were. No room geometry, no obstacles."""
     box = Box(np.asarray(truth.standby, dtype=float), np.asarray(volume, dtype=float))
-    return replace(truth, roi=box, workspace=box, no_fly=(), gt_mesh=None, kind="room")
+    alt = truth.altitude if band is None else tuple(float(x) for x in band)
+    return replace(truth, roi=box, workspace=box, no_fly=(), gt_mesh=None, kind="room", altitude=alt)
 
 
 def in_frustum(points: np.ndarray, p: np.ndarray, R: np.ndarray, K: Intrinsics, dmin: float, dmax: float) -> np.ndarray:

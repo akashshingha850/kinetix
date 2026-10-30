@@ -85,6 +85,7 @@ def test_exploration_closes_the_room_and_recovers_walls_and_obstacles(tmp_path):
     assert vs["roi_max_err_m"] <= 0.25, vs                                   # every wall within a voxel and a bit
     assert vs["obstacles_found"] == 2 and vs["obstacles_fitted"] == 2, vs
     assert min(rep["faces"].values()) >= 0.25                              # every face seen (the 'stable' stop rule's floor)
+    assert np.isclose(scene.altitude[1], scene.roi.hi[2] - 0.6 - 0.4)      # the band's top follows the fitted ceiling
     out = next(tmp_path.glob("*/explore"))
     assert (out / "scene.yaml").exists() and (out / "occupancy.npz").exists() and (out / "steps.jsonl").exists()
     assert json.loads((out / "report.json").read_text())["stop_reason"] in ("closed", "stable")
@@ -327,9 +328,11 @@ def test_fit_puts_the_wall_on_its_dense_sheet_not_on_a_drifted_copy_beyond_it():
         L[c(-5):c(5), c(y), zc(0):zc(8.0)] = 5
     L[c(6.4), c(-4):c(4):3, zc(0):zc(8.0):2] = 5                      # the weaker copy of the east wall, 1.4 m out
     L[c(-5):c(5):2, c(-4):c(4), zc(-0.4)] = 5                        # a sparser floor layer 0.4 m under it (depth reading long)
-    L[c(-3):c(3), c(1), zc(6.6)] = 5                                  # a roof beam, above the flight volume: not an obstacle
+    L[c(-3):c(3), c(1), zc(6.6)] = 5                                  # a roof beam, above a band capped at 4.9 m: not an obstacle
     L[c(0):c(0.4), c(-2):c(-1.6), zc(0):zc(8.0)] = 5                  # a post in the room: one
-    scene, rep = fit_scene(omap, hint_scene(TRUTH, [16, 16, 7]), cfg["explore"]["fit"])
+    dyn, _ = fit_scene(omap, hint_scene(TRUTH, [16, 16, 7]), cfg["explore"]["fit"])
+    assert np.isclose(dyn.altitude[1], dyn.roi.hi[2] - 1.0) and len(dyn.no_fly) == 2   # band up to the ceiling: the beam is in reach
+    scene, rep = fit_scene(omap, hint_scene(TRUTH, [16, 16, 7]), {**cfg["explore"]["fit"], "altitude_above_floor_m": [1.1, 4.9]})
     assert scene is not None, rep
     assert abs(scene.roi.hi[0] - 5.0) <= 0.2, scene.roi
     assert abs(scene.roi.lo[2] - 0.0) <= 0.2 and rep["faces"]["floor"] > 0.5, (scene.roi, rep["faces"])

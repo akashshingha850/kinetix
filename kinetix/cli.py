@@ -21,9 +21,10 @@ def cmd_run(a) -> int:
             raise SystemExit("--explore: a room scene with --method tour (the room is explored, then toured)")
         a.overrides = list(a.overrides) + ["explore.enabled=true"]
     cfg = load_config(a.config or [], a.overrides, kind=scene.kind)
+    scene = load_scene(a.scene, cfg)    # again with this run's config: `altitude_m: auto` takes its band settings
     if a.explore:                       # the scene file only scores the fit: planner and rig get a take-off point and a search volume
         from acquisition.planner.explore import hint_scene
-        truth, scene = scene, hint_scene(scene, cfg["explore"]["volume_m"])
+        truth, scene = scene, hint_scene(scene, cfg["explore"]["volume_m"], cfg["explore"].get("altitude_m"))
     tag = ("explore-opt" if cfg["explore"]["reuse_views"] else "explore-trad") if a.explore else ""
     log = RunLog(a.out, scene.name, a.method, a.rig, a.seed, cfg, uses_gt=False, repo_root=ROOT, tag=tag)
     log.info(f"run {log.run_id}: scene {scene.name} ({scene.kind}), method {a.method}, rig {a.rig}, "
@@ -62,7 +63,7 @@ def main(argv=None) -> int:
     r.add_argument("--explore", action="store_true",
                    help="room + tour: explore the room with the ZED depth first (the scene file's room and obstacles are not used, only "
                         "its take-off point and altitude band; it scores the fit)")
-    r.add_argument("--config", action="append", help="extra config YAML over acquisition/config/default.yaml (repeatable)")
+    r.add_argument("--config", action="append", help="extra config YAML over acquisition/config/ (e.g. acquisition/config/experiments/close.yaml; repeatable)")
     r.add_argument("--out", default=str(DATA))
     r.add_argument("overrides", nargs="*", help="key=value, e.g. planner.budget=12")
     f = sub.add_parser("sfm", help="offline SfM over a run's frames (pycolmap) + ATE and proxy completeness")

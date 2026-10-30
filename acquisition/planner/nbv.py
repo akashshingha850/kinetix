@@ -75,7 +75,7 @@ def run_nbv(cfg: dict, scene: Scene, rig, recon, method: str, log, seed: int = 0
     if scene.kind == "room":
         if method == "orbit":
             raise ValueError("orbit is an object baseline (rings around the ROI); a room scene has no orbit")
-        sampler = GridSampler(pc["grid"]["spacing_m"], pc["grid"]["heights"], pc["grid"]["n_yaw"])
+        sampler = GridSampler(pc["grid"]["spacing_m"], pc["grid"]["heights"], pc["grid"]["n_yaw"], pc["grid"].get("layer_m"))
     else:
         sampler = RingSampler(pc["rings"]["radii"], pc["rings"]["heights"], pc["rings"]["n_az"])
     cons = BoxConstraints(pc["clearance_m"], pc["roi_clearance_m"])

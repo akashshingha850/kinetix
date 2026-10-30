@@ -1,0 +1,22 @@
+# Object scenes (`kind: object`): one ROI box scanned from close up, NBV over ring-stack candidates. Over common.yaml.
+
+coverage:
+  spacing_m: 0.04                # surface sample spacing on the ROI box
+  depth_range_m: [0.2, 4.0]
+
+planner:
+  budget: 20                     # images
+  seed_views: 1                  # nearest feasible view first, then NBV
+  coverage_target: 0.95          # stop when this fraction of the ROI proxy surface is triangulated
+  min_gain: 0.005                # gain plateau: below this for `patience` steps
+  patience: 2
+  travel_weight: 0.02            # utility = gain - travel_weight * metres - yaw_weight * |dyaw| rad
+  yaw_weight: 0.005
+  clearance_m: 0.35              # drone radius + margin around no-fly boxes
+  rings:                         # ring-stack candidates around the ROI's vertical axis (map z)
+    radii: [1.2, 1.6]
+    heights: [1.0, 1.35, 1.7, 2.0]
+    n_az: 24
+  orbit:                         # `orbit` baseline: the ring closest to this radius/height
+    radius: 1.2
+    height: 1.35

@@ -75,7 +75,7 @@ weaker sheet beyond it is that wall mapped again after pose drift: fitting to it
 Outputs in `<run>/explore/`: `scene.yaml` (the fitted room in scene-file format), `occupancy.npz`, `steps.jsonl` (one record per view:
 faces seen, known fraction, frontier, target) and `report.json` (with `vs_truth` when a scene file is given). `steps.jsonl` of the
 run itself still starts with the tour plan. Dry rig: `acquisition/rig/simdepth.py` ray-casts depth against a true scene the planner never
-sees. Config: `explore.*` in `acquisition/config/default.yaml`. From the GCS: the Kinetix tab's "explore it first" box.
+sees. Config: `explore.*` in `acquisition/config/room.yaml`. From the GCS: the Kinetix tab's "explore it first" box.
 
 ## 6. Online reconstruction (`acquisition/mapping/state.py`)
 

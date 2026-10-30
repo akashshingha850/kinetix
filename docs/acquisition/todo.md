@@ -5,6 +5,17 @@ Current phase: **K1**, with a room-capture track run ahead of it (ADR-K11, ADR-K
 
 ## Now — room photogrammetry (Warehouse, `kinetix/scenes/warehouse_room.yaml`)
 How to run it: `METHOD=tour scripts/room_scan.sh all` (sim up, fly, `kinetix sfm`), or [architecture.md](architecture.md) §5a.
+- [ ] **Config split, room height, experiments (2026-10-30)**: `acquisition/config/default.yaml` is now `common.yaml` (camera, rig,
+  shared keys) + `object.yaml` (rings, orbit, object coverage/planner) or `room.yaml` (grid, tour, and `explore`, moved here), picked by
+  the scene's `kind`; the merged configs are unchanged apart from the two height keys below. Room height: `planner.grid.heights: auto`
+  fills the altitude band with layers `<= layer_m` 1.6 m apart (edges included; a list of map z still works), and with `--explore` the
+  band's top follows the fitted ceiling (`explore.fit.altitude_above_floor_m: [1.1, null]`, was 4.9; top = ceiling - 1.0 m). Dry
+  Warehouse tour on the scene file's band (1.1..4.9 -> 4 layers): coverage 0.964 -> 0.994, 101 -> 98 m, 301 -> 331 frames. Not flown
+  yet: in the 9 m Warehouse with `--explore` the band now reaches ~8.1 m, so the roof beams (8.8 m) count as obstacles within
+  `obstacle_reach_m` (unit test `test_fit_puts_the_wall...`). Experiments: overlays `acquisition/config/experiments/{close, dense,
+  sparse, fine_grid, slow, traditional}.yaml` (`--config`, or `room_scan.sh --experiment NAME`; each sets `experiment:` in run.yaml),
+  compared by SfM result with `uv run python -m acquisition.compare` (one row per run + the config keys that differ). Next: fly each
+  overlay twice in the Warehouse with `--explore`, then `kinetix sfm` + compare.
 - [x] **Pose + depth per frame (2026-10-27)**: `rig.save_depth` (on for room scenes, `acquisition/config/room.yaml`) saves the ZED `depth_registered` of every
   keyframe to `data/<run>/depth/<idx>.npy` (float32 m, NaN/inf = no return, matched to the image by stamp) and records it in
   `frames.jsonl` (`depth`, `depth_source: zed`); recorded only, never a planner input (interfaces.md §4, data-format.md §3). Old `data/` purged

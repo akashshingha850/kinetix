@@ -16,6 +16,7 @@ from dataclasses import replace
 import numpy as np
 
 from acquisition.mapping.depthmap import OccupancyMap
+from kinetix.config import altitude_band
 from kinetix.types import Box, Scene
 
 AXIS_FACE = {0: ("x-", "x+"), 1: ("y-", "y+"), 2: ("floor", "ceiling")}
@@ -173,8 +174,7 @@ def fit_scene(omap: OccupancyMap, hint: Scene, fcfg: dict) -> tuple[Scene | None
     for ax in (0, 1):
         mm = min(wm, 0.4 * (hi[ax] - lo[ax]))                         # a small room keeps a flyable core
         wlo[ax], whi[ax] = lo[ax] + mm, hi[ax] - mm
-    zlo = lo[2] + fcfg["altitude_above_floor_m"][0]
-    zhi = min(lo[2] + fcfg["altitude_above_floor_m"][1], hi[2] - fcfg["ceiling_margin_m"] - 0.4)
+    zlo, zhi = altitude_band(lo[2], hi[2], fcfg)                      # follows the fitted ceiling unless capped
     if zhi <= zlo:
         return None, {**report, "closed": False, "why": "room too low for the altitude band"}
     wlo[2], whi[2] = zlo, zhi

@@ -5,19 +5,21 @@
 #   inner walls world x -10.13..9.21, y -12.0..17.8; floor 0.00; ceiling panels 9.0, roof beams 8.8, rafters from 5.83 over
 #   the open floor; portal-frame columns against both long walls at y -9/-3/3/9/15 (inside the margin, not modelled).
 # Since 2026-10-22 bisg empties the room (sim.yaml keep_only + drop): no racks, cart, bins, fuse box, ceiling lamps or the
-# lattice trusses (the "rafters from 5.83"); floor + stripes, walls, columns, ceiling and roof beams stay. So: no no_fly
-# boxes, workspace out to the west wall margin. Altitude band unchanged (keeps runs comparable with the 2026-10-17/18 ones).
+# lattice trusses (the "rafters from 5.83"), and since 2026-10-30 no pillars (wall columns, roof pillars); floor + stripes, walls,
+# ceiling and roof beams stay. So: no no_fly
+# boxes, workspace out to the west wall margin. Altitude band: `auto` since 2026-10-30 (was [1.1, 4.9], world 1.0..4.8).
 name: warehouse_room
 kind: room
 source: {asset: "Isaac 6.0 Environments/Simple_Warehouse/warehouse.usd (bisg world preset Warehouse)", dataset: isaac, licence: "NVIDIA Isaac Sim assets", redistributable: false, scale: 1.0}
 
 # The room's inner box (map): its walls, floor and ceiling are the surface to reconstruct.
 roi:       {center: [1.916, 2.9, 4.616], size: [19.34, 29.8, 9.0], yaw_deg: 0}
-# Where the camera may be: >= 1.5 m from the walls (world x -8.63..7.71, y -10.5..16.3), world z 0.8..4.8
+# Where the camera may be: >= 1.5 m from the walls (world x -8.63..7.71, y -10.5..16.3); its z is replaced by the altitude band
 workspace: {center: [1.911, 2.9, 3.016], size: [16.34, 26.8, 4.0], yaw_deg: 0}
 no_fly: []                       # obstacles: block flight, occlude, and are surface too. The emptied Warehouse has none (until
                                  # 2026-10-22: pallet racks, push cart + KLT bins, fuse box)
-altitude_m: [1.1, 4.9]           # camera height in map (floor = map +0.12; world 1.0..4.8)
+altitude_m: auto                 # camera height band from the room box: 1.1 m over the floor .. 1.0 m under the ceiling (room.yaml
+                                 # explore.fit; map 1.22..8.12, world 1.1..8.0; floor = map +0.12). Or a fixed [low, high] in map z
 standby: [0.0, 0.0, 1.2]         # camera position after takeoff: straight above the spawn point
 gt_mesh: null
 sim:

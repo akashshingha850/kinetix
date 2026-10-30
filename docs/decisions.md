@@ -115,8 +115,8 @@ reconstruct, and obstacles (racks, carts) both block flight and are part of the 
 the `no_fly` boxes occlude it (`kinetix/coverage.py`, same triangulation rule as objects: two rays ≥ `tri_min_deg` apart).
 Candidates are a 4-DoF grid in the `workspace` (`acquisition/planner/sampler.py` `GridSampler`). A candidate is only worth flying to if
 at least `min_overlap` of what it sees is already seen, so every new image can register in SfM (connectivity, which an
-object orbit gets for free). Room-specific defaults live in `acquisition/config/room.yaml`, layered automatically after `default.yaml` for room
-scenes. The online model is still the GT-free coverage proxy; offline, `kinetix sfm` reconstructs the captured images with pycolmap
+object orbit gets for free). Room-specific defaults live in `acquisition/config/room.yaml`, layered automatically after `common.yaml` for room
+scenes (object scenes get `object.yaml`). The online model is still the GT-free coverage proxy; offline, `kinetix sfm` reconstructs the captured images with pycolmap
 (registration, ATE, completeness against the proxy surface). The MAVROS rig records each flight to an MCAP rosbag in the run dir.
 **Evidence (2026-10-17, Warehouse, T2).** Flight 1 (47 views planned with a 35° match limit and a 30 % overlap fraction, 351 m,
 21 min, landed): exhaustive SIFT matching "verified" 817 of 1128 pairs, most of them false matches between identical 6 m bays
