@@ -1,0 +1,21 @@
+stdin is not a terminal device. Keyboard handling disabled.[INFO] [1793384100.491151680] [rosbag2_recorder]: Press SPACE for pausing/resuming
+[INFO] [1793384100.491165917] [rosbag2_recorder]: Event publisher thread: Started
+[INFO] [1793384100.494222959] [rosbag2_recorder]: Starting recording to '/kinetix/data/261030-181459_warehouse_room_roi_coverage/rosbag'
+[INFO] [1793384100.496276981] [rosbag2_recorder]: Subscribed to topic '/tf_static'
+[INFO] [1793384100.496582004] [rosbag2_recorder]: Subscribed to topic '/tf'
+[INFO] [1793384100.496652857] [rosbag2_recorder]: Listening for topics...
+[INFO] [1793384100.496660162] [rosbag2_recorder]: Recording...
+[INFO] [1793384100.496680722] [rosbag2_recorder]: Topics discovery started.
+[INFO] [1793384100.497777339] [rosbag2_recorder]: Subscribed to topic '/drone_1/zed/zed_node/left/color/rect/camera_info'
+[INFO] [1793384100.498087417] [rosbag2_recorder]: Subscribed to topic '/drone_1/zed/zed_node/left/color/rect/image/compressed'
+[INFO] [1793384100.499085493] [rosbag2_recorder]: Subscribed to topic '/drone_1/mavros/local_position/pose'
+[INFO] [1793384100.510494727] [rosbag2_recorder]: Subscribed to topic '/drone_1/mavros/setpoint_position/local'
+[INFO] [1793384100.514166651] [rosbag2_recorder]: Subscribed to topic '/drone_1/mavros/state'
+[INFO] [1793384100.516078740] [rosbag2_recorder]: Subscribed to topic '/clock'
+[INFO] [1793384100.516520954] [rosbag2_recorder]: Subscribed to topic '/drone_1/state/pose'
+[INFO] [1793384100.516539019] [rosbag2_recorder]: All requested topics are subscribed. Stopping discovery...
+[INFO] [1793384100.516542585] [rosbag2_recorder]: Topics discovery stopped.
+[INFO] [1793384573.049837111] [rosbag2_recorder]: Pausing recording.
+[INFO] [1793384573.049900388] [rosbag2_cpp]: Writing remaining messages from cache to the bag. It may take a while
+[INFO] [1793384573.053665966] [rosbag2_recorder]: Recording stopped
+[INFO] [1793384573.064180074] [rosbag2_recorder]: Event publisher thread: Exited

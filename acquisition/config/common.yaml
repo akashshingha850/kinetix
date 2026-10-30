@@ -1,8 +1,8 @@
 # Kinetix settings shared by every scene (architecture.md §10). Layered: common.yaml < object.yaml | room.yaml (by the
 # scene's `kind`) < --config files (e.g. experiments/*.yaml) < key=value overrides.
 
-camera:                          # nominal ZED Mini left rect 720p; the mavros rig replaces K with camera_info
-  width: 1280
+camera:                          # nominal ZED Mini left rect 720p (101 x 68 deg; 1080p is a crop of the 2K sensor, 84 x 54 deg, f 1059.6:
+  width: 1280                    # tried 2026-10-30, the dry Warehouse explore/tour lost coverage); the mavros rig replaces K with camera_info
   height: 720
   fx: 529.8
   fy: 529.8

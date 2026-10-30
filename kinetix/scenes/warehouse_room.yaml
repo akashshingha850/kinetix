@@ -5,8 +5,8 @@
 #   inner walls world x -10.13..9.21, y -12.0..17.8; floor 0.00; ceiling panels 9.0, roof beams 8.8, rafters from 5.83 over
 #   the open floor; portal-frame columns against both long walls at y -9/-3/3/9/15 (inside the margin, not modelled).
 # Since 2026-10-22 bisg empties the room (sim.yaml keep_only + drop): no racks, cart, bins, fuse box, ceiling lamps or the
-# lattice trusses (the "rafters from 5.83"), and since 2026-10-30 no pillars (wall columns, roof pillars); floor + stripes, walls,
-# ceiling and roof beams stay. So: no no_fly
+# lattice trusses (the "rafters from 5.83"), and since 2026-10-30 no wall brackets; floor + stripes, walls, columns, roof pillars,
+# ceiling and roof beams stay (the pillars are VIO texture: bisg docs/todo.md). So: no no_fly
 # boxes, workspace out to the west wall margin. Altitude band: `auto` since 2026-10-30 (was [1.1, 4.9], world 1.0..4.8).
 name: warehouse_room
 kind: room
