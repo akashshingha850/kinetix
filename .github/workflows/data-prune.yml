@@ -4,10 +4,9 @@ name: data prune
 on:
   push:
     paths: ["data/*/run.yaml"]
-# Needs the secret KX_DATA_TOKEN: a fine-grained token with Contents read/write on akashshingha850/kinetix-data (the release is
-# in that private repo, which this workflow's own token cannot reach).
+# The release is this repo's own (data/sync.sh), so the workflow's token deletes its assets: no secret needed.
 permissions:
-  contents: read
+  contents: write
 jobs:
   prune:
     runs-on: ubuntu-latest
@@ -18,7 +17,7 @@ jobs:
       - name: delete the release copies of runs this push deleted
         env:
           BEFORE: ${{ github.event.before }}
-          GH_TOKEN: ${{ secrets.KX_DATA_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           git cat-file -e "$BEFORE^{commit}" 2>/dev/null || { echo "no previous commit (new branch or force push): nothing to prune"; exit 0; }
           gone=""
@@ -29,6 +28,4 @@ jobs:
             gone="$gone $r"
           done
           [ -n "${gone// /}" ] || { echo "nothing to prune"; exit 0; }
-          # checked only now, so pushes that delete nothing stay green without the secret
-          [ -n "$GH_TOKEN" ] || { echo "::error::secret KX_DATA_TOKEN is not set (see the comment at the top of this workflow)"; exit 1; }
           data/sync.sh prune -y $gone
