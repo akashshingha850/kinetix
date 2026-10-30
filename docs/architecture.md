@@ -112,7 +112,7 @@ Target layout (created incrementally per [roadmap.md](roadmap.md); not built yet
 kinetix/                         shared: both areas import it, it imports neither (cli.py excepted)
   types.py       Pose, Intrinsics, Frame, Candidate, Scene, RunInfo (dataclasses)
   geometry.py    SE3/Sim3, look-at, frame conversions (ENU map, OpenCV optical, COLMAP)
-  config.py      YAML layering + key=value overrides; ROOT, DATA, RESULTS, SCENES paths
+  config.py      YAML layering + key=value overrides; ROOT, DATA, SCENES paths
   runlog.py      run-directory writer/reader (data-format.md)
   align.py       Sim3 / Umeyama, ATE
   coverage.py    surface-coverage model (planner gain, reconstruction's completeness proxy)
@@ -142,8 +142,7 @@ reconstruction/                  author B: turns a flight into a model and score
   metrics.py     accuracy, completeness, Chamfer, F-score, ATE, PSNR/SSIM
   evaluate.py    run dir → metrics.json
   tests/
-data/            flights, one run dir each (large files git-ignored, data/sync.sh; data-format.md §3); written by acquisition
-results/         results/<run>/<method>/ (large files git-ignored, same); written by reconstruction
+data/            one run dir each (large files git-ignored, data/sync.sh; data-format.md §3): the flight by acquisition, <method>/ by reconstruction
 bench/           matrix.py (scenes × methods × budgets × seeds → runs), report.py (tables + efficiency curves)
 sim/             render_server.py (Isaac standalone, pool batch + serve mode), scene build helpers
 docker/          Dockerfile (ros:jazzy-ros-base), compose.yaml

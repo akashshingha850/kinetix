@@ -4,14 +4,14 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .ruff_cache/
-# data/<run>/ (flights) and results/<run>/<method>/ (reconstruction): the small text files are in git, the large ones below are
+# data/<run>/ (flight + reconstruction's <method>/ subdirs, e.g. sfm/): the small text files are in git, the large ones below are
 # not; data/sync.sh puts/gets them as one zip per run on the GitHub release `data` (data/.dropped: runs this machine skips)
 data/*/frames/
 data/*/depth/
-results/*/*/database.db
-results/*/*/sparse/
-results/*/*/tri/
-results/*/*/*.ply
+data/*/*/database.db
+data/*/*/sparse/
+data/*/*/tri/
+data/*/*/*.ply
 data/.dropped
 .env
 # flight recordings (MavrosRig rig.bag, ADR-K11): never in git, synced with the run's zip

@@ -194,7 +194,7 @@ kinetix check                                    # = scripts/check_env.py
 kinetix pool make  --scene S --layout rings:4x60|tammes:128 [--test-split 0.1]   # views.jsonl → T1 batch render
 kinetix run   --scene S --method M --sensing mono|stereo_plan|... --rig pool|isaac|mavros --seed K [key=value ...]  → data/<id>/
 kinetix depth-study --scene S --sources stereo_learned,mono,gt [--zed]  → docs/paper/research/depth-study.md data
-kinetix eval  data/<id> [--densify gsplat|colmap_mvs]                  → results/<id>/<method>/metrics.json
+kinetix eval  data/<id> [--densify gsplat|colmap_mvs]                  → data/<id>/<method>/metrics.json
 kinetix bench --matrix config/bench/<name>.yaml [--jobs N]             → bench/<name>/report.md
 ```
 

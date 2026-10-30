@@ -3,7 +3,7 @@
 Adaptive NBV photogrammetry for indoor objects and whole rooms (ADR-K11/K12) with a monocular drone. Read `docs/architecture.md` first,
 then `docs/acquisition/todo.md` for the current phase. Update `docs/acquisition/todo.md` when work is finished.
 Layout (no `src/`): `kinetix/` shared library, `acquisition/` (author A; todo `docs/acquisition/todo.md`, branch `acquisition`), `reconstruction/`
-(author B; todo `docs/reconstruction/todo.md`, branch `reconstruction`), flights in `data/<run>/`, outputs in `results/<run>/<method>/`
+(author B; todo `docs/reconstruction/todo.md`, branch `reconstruction`), flights in `data/<run>/`, outputs beside them in `data/<run>/<method>/`
 (`docs/collaboration.md`). The areas meet only at the run directory (data-format.md §3) and `kinetix/`. Shared paths (`kinetix/`,
 data-format/interfaces/publication-plan, deps) change by a separate PR. Tests live in each package's `tests/`.
 

@@ -12,7 +12,7 @@ kinetix/              shared library (types, geometry, config, runlog, align, co
 acquisition/          author A: planner/  mapping/  rig/  config/  tests/
 reconstruction/       author B: sfm.py (densify.py, ...)  tests/
 data/<run>/           flights: acquisition writes, reconstruction reads (text in git, large files on the release)
-results/<run>/<m>/    outputs: reconstruction writes, one folder per method (same split)
+  <method>/           outputs: reconstruction writes, one folder per method (sfm/ today; same split)
 docs/                 shared docs at the top (architecture, data-format, interfaces, decisions, roadmap, setup, testing)
   acquisition/        architecture.md (loop, tour, explore, NBV), ros-pipeline.md, todo.md
   reconstruction/     pipeline.md, todo.md
@@ -25,7 +25,7 @@ docker/  scripts/
 | Area | Owner | Paths | Todo |
 |---|---|---|---|
 | Acquisition | author A | `acquisition/` (planner, online mapping, rig, config, tests incl. `nbv_bench.py`), `data/`, `scripts/room_scan.sh` (fly part) | [acquisition/todo.md](acquisition/todo.md) |
-| Reconstruction | author B | `reconstruction/` (one module per method: `sfm.py`, `densify.py`, `gsplat.py`, `eval.py`, ..., tests in `reconstruction/tests/`), `results/` | [reconstruction/todo.md](reconstruction/todo.md) |
+| Reconstruction | author B | `reconstruction/` (one module per method: `sfm.py`, `densify.py`, `gsplat.py`, `eval.py`, ..., tests in `reconstruction/tests/`), `data/<run>/<method>/` | [reconstruction/todo.md](reconstruction/todo.md) |
 | Shared, change by PR with both reviewing | both | `kinetix/` (incl. `scenes/`), [data-format.md](data-format.md), [interfaces.md](interfaces.md), [paper/publication-plan.md](paper/publication-plan.md), `pyproject.toml` / `uv.lock`, `docker/` | — |
 
 `kinetix/coverage.py` is shared because both sides use it (planner gain, `reconstruction/sfm.py`'s completeness proxy): a change must keep
@@ -34,8 +34,8 @@ docker/  scripts/
 ## The contract: a run directory
 
 - Acquisition **writes** `data/<run>/`: `run.yaml`, `frames.jsonl`, `frames/`, `depth/`, `steps.jsonl`, `explore/`, `rosbag/`.
-- Reconstruction **reads** those and writes only to `results/<run>/<method>/` (`sfm/` today, with a `metrics.json`). It never writes
-  into `data/`.
+- Reconstruction **reads** those and writes only to `data/<run>/<method>/` (`sfm/` today, with a `metrics.json`). It never changes
+  the flight's own files.
 - A new field in `frames.jsonl` or `run.yaml` goes into data-format.md §3 first (CLAUDE.md rule), in a small PR to `main`.
 
 ## Shared data

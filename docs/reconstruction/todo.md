@@ -1,6 +1,6 @@
 # Todo: reconstruction
 
-Owner: author B ([collaboration.md](../collaboration.md)). Code in `reconstruction/`, results in `results/<run>/<method>/metrics.json`, compared
+Owner: author B ([collaboration.md](../collaboration.md)). Code in `reconstruction/`, results in `data/<run>/<method>/metrics.json`, compared
 on the frozen benchmark runs listed in collaboration.md. Acquisition work is in [acquisition/todo.md](../acquisition/todo.md); its flight notes hold the SfM numbers so far.
 
 ## Now

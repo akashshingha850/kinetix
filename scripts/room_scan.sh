@@ -83,7 +83,7 @@ sfm(){
   [[ "$run" = /* ]] || run="$KX/$run"
   say "reconstructing $(basename "$run")"
   kx python3 -m kinetix sfm "data/$(basename "$run")"
-  say "result: $KX/results/$(basename "$run")/sfm/  (points.ply, metrics.json)"
+  say "result: $KX/data/$(basename "$run")/sfm/  (points.ply, metrics.json)"
 }
 
 case "$CMD" in

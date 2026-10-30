@@ -123,7 +123,12 @@ How to run it: `METHOD=tour scripts/room_scan.sh all` (sim up, fly, `kinetix sfm
   from closer views, as far as ATE and the 0.25 m completeness proxy can tell (neither sees GSD). Exploration at max_steps 20 is
   marginal in the Warehouse (2 of 4 flights missed the y- end after a first move that saw ~0 frontier). Next: the control, budget
   120 at a flat 12 m (more views, not closer), and a resolution metric (GSD / point density on the true surface) before trading
-  flight time for distance
+  flight time for distance.
+  Repeat (`20261029-194829`, same config as `132346`, fresh sim, after the rebase on main): explore reached the y- end (34 views,
+  max wall error 0.41 m), 990 frames, 384 m, 17.7 min wall, coverage 0.97. SfM: all 990 registered, 49 k points, track 6.2,
+  completeness 0.54 (walls 0.52, floor 0.58, ceiling 0.53, as `132346`); ATE rmse 0.52 m, but that is 5 explore views
+  (900005-900026, 1.6-12.5 m off, the explore-view BA bug of `163032`): without them rmse 0.24, median 0.16 (was 0.096). EKF2 vs
+  GT p50 0.57 m, max 1.0 m over the flight
 - [ ] Explore, pose after big turns: capture only once the VIO has settled (spikes of 4-5.5 deg / 0.3-0.6 m for seconds), or slower
   turns while exploring; bisg side: why the ZED/EKF yaw jumps after a turn (map_correction / compass in the zed bridge)
 - [x] Room fit: obstacles must reach within `fit.obstacle_reach_m` (1 m) of the workspace (2026-10-27): roof beams at 8 m dropped

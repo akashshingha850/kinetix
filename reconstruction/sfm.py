@@ -18,7 +18,7 @@ Sim3-aligned to the rig's camera centres (EKF2, `frames.jsonl` pose) and, in the
 Completeness is measured against the scene's proxy surface (recon/coverage.py): a surface point counts as reconstructed when a
 sparse point lies in its voxel neighbourhood after the EKF2 alignment. Reads the run directory only (dependency rule).
 
-Writes results/<run>/sfm/{database.db, sparse/<k>/, points.ply, metrics.json}.
+Writes data/<run>/sfm/{database.db, sparse/<k>/, points.ply, metrics.json}.
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ import numpy as np
 import yaml
 
 from kinetix.align import apply, ate, umeyama
-from kinetix.config import RESULTS, SCENES, load_scene
+from kinetix.config import SCENES, load_scene
 from kinetix.coverage import CoverageState
 from kinetix.types import Intrinsics
 
@@ -220,7 +220,7 @@ def run_sfm(run: Path | str, scene_path: Path | str | None = None, max_features:
     frames = [f for f in _frames(run) if f.get("image")]
     if len(frames) < 3:
         raise SystemExit(f"{run}: {len(frames)} frames with images, need >= 3")
-    out = RESULTS / run.name / "sfm"
+    out = run / "sfm"
     if out.exists():
         shutil.rmtree(out)
     (out / "sparse").mkdir(parents=True)

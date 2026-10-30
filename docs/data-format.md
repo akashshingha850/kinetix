@@ -84,7 +84,8 @@ selectable. `test` views are never selectable either. They are held out for nove
 
 ## 3. Run — `data/<run_id>/`
 
-`run_id = <YYYYmmdd-HHMMSS>_<scene>_<method>_<rig>_s<seed>`.
+`run_id = <yymmdd-HHMMSS>_<scene>_<method>[-explore-opt|-explore-trad]` (rig and seed are in `run.yaml`; runs before 2026-10-30
+have the old `<YYYYmmdd-HHMMSS>_<scene>_<method>[-explore-optimized|...]_<rig>_s<seed>`).
 
 ```
 run.yaml           resolved config + provenance (written at start, summary appended at close)
@@ -99,11 +100,11 @@ rosbag/            MCAP recording of the flight (T2/T3, `rig.bag`; topics in int
 log.txt            human log
 ```
 
-Acquisition writes `data/<run_id>/`; reconstruction only reads it and writes `results/<run_id>/<method>/`:
+Acquisition writes `data/<run_id>/`; reconstruction reads it and adds one subdir per method, never touching the flight's files:
 
 ```
-results/<run_id>/sfm/       offline SfM over all frames (`kinetix sfm`: database.db, pairs.txt, sparse/<k>/, points.ply in map, metrics.json)
-results/<run_id>/<method>/  dense.ply | mesh.ply | gs/ (per densifier) + metrics.json (`kinetix eval`)
+data/<run_id>/sfm/          offline SfM over all frames (`kinetix sfm`: database.db, pairs.txt, sparse/<k>/, points.ply in map, metrics.json)
+data/<run_id>/<method>/     dense.ply | mesh.ply | gs/ (per densifier) + metrics.json (`kinetix eval`)
 ```
 
 ```yaml

@@ -307,7 +307,7 @@ def test_cli_traditional_arm_names_the_run_and_reuses_no_views(tmp_path):
     main(["run", "--scene", str(ROOT / "kinetix" / "scenes" / "warehouse_room.yaml"), "--method", "tour", "--explore",
           "--out", str(tmp_path), "explore.reuse_views=false"])
     (run,) = tmp_path.iterdir()
-    assert run.name.endswith("_warehouse_room_tour-explore-traditional_dry_s0"), run.name
+    assert run.name.endswith("_warehouse_room_tour-explore-trad"), run.name
     assert not any(str(json.loads(f)["pool_id"]).startswith("explore_") for f in (run / "frames.jsonl").read_text().splitlines())
 
 

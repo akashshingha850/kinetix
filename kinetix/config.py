@@ -13,8 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]          # repo root (kinetix/config.
 DEFAULT = ROOT / "acquisition" / "config" / "default.yaml"
 ROOM = ROOT / "acquisition" / "config" / "room.yaml"  # layered after default.yaml for `kind: room` scenes (ADR-K11)
 SCENES = ROOT / "kinetix" / "scenes"                # scene files, shared: acquisition flies them, reconstruction scores against them
-DATA = ROOT / "data"                                # flights (run dirs), git-ignored; written by acquisition only
-RESULTS = ROOT / "results"                          # results/<run>/<method>/, git-ignored; written by reconstruction only
+DATA = ROOT / "data"                                # run dirs: acquisition writes the flight, reconstruction its <method>/ subdirs
 
 
 def merge(a: dict, b: dict) -> dict:
