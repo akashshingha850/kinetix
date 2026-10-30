@@ -18,7 +18,7 @@
 #   data/sync.sh delete [-y] RUN...     delete the run everywhere: local files, git (`git rm`, you commit) and the release
 #   data/sync.sh prune [-y] [RUN...]    delete release copies of runs not in git (default: all of them)
 #
-# RUN is a run id or a path to it. Env: KX_DATA_REPO (default: the private akashshingha850/kinetix-data), KX_DATA_TAG (default:
+# RUN is a run id or a path to it. Env: KX_DATA_REPO (default: this repo, akashshingha850/kinetix, private), KX_DATA_TAG (default:
 # data), TMPDIR (zips are staged there: a run needs its size free, ~7 GB for a tour). GitHub caps an asset at 2 GiB: bigger zips go up as <RUN>.zip.00, .01, ...
 set -euo pipefail
 
@@ -32,7 +32,7 @@ die(){ printf '\033[1;31m[sync] %s\033[0m\n' "$*" >&2; exit 1; }
 command -v gh >/dev/null || die "needs the GitHub CLI (gh) and 'gh auth login'"
 command -v zip >/dev/null && command -v unzip >/dev/null || die "needs zip and unzip"
 cd "$KX"
-REPO="${KX_DATA_REPO:-akashshingha850/kinetix-data}"   # private: each author needs access to it
+REPO="${KX_DATA_REPO:-akashshingha850/kinetix}"   # this repo's own release: private, like the repo (the frames are NVIDIA renders)
 STAGE=$(mktemp -d); trap 'rm -rf "$STAGE"' EXIT
 
 assets(){ gh release view "$TAG" -R "$REPO" --json assets -q '.assets[] | "\(.name) \(.size)"' 2>/dev/null || true; }
