@@ -42,8 +42,8 @@ docker/  scripts/
 
 A run's small text files (`run.yaml`, `frames.jsonl`, `steps.jsonl`, `log.txt`, `explore/`, `metrics.json`, ...) are in git. The
 large ones (`frames/`, `depth/`, `rosbag/`, the SfM `database.db`, `sparse/`, `tri/`, `*.ply`: GBs per flight; the list is
-`.gitignore`) go to the release `data` of the private repo `akashshingha850/kinetix-data` (each author needs access; the Action
-needs the secret `KX_DATA_TOKEN`, see the workflow) as one zip per run (split in < 2 GiB parts). **git says which runs exist**; the
+`.gitignore`) go to this repo's own release `data` (the repo is private, so the release is too: the frames are NVIDIA renders, not
+redistributable) as one zip per run (split in < 2 GiB parts). **git says which runs exist**; the
 release only stores their large files. It syncs on git's own steps, once per clone `git config core.hooksPath .githooks`:
 
 | you do | runs | effect |
