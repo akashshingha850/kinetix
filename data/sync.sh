@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Large run files on a GitHub release, one zip per run. A run's small text files (run.yaml, frames.jsonl, metrics.json, ...) are in
-# git and say which runs exist; the release only stores the large ones (the git-ignored part of data/<run>/ and results/<run>/:
+# git and say which runs exist; the release only stores the large ones (the git-ignored part of data/<run>/:
 # frames, depth, rosbag, SfM models; the list is .gitignore). A run deleted from git is never brought back.
 #
 # Automatic (docs/collaboration.md "Shared data"; once per clone: git config core.hooksPath .githooks):
@@ -40,7 +40,7 @@ release_runs(){ assets | awk '{print $1}' | sed -E 's/\.zip(\.[0-9]+)?$//' | sor
 git_runs(){ git ls-files 'data/*/run.yaml' | cut -d/ -f2 | sort -u; }
 local_runs(){ for d in data/*/; do r=$(basename "$d"); [[ -f $d/run.yaml || -n $(big_files "$r") ]] && echo "$r"; done | sort -u; }
 dropped(){ sort -u "$DROPPED" 2>/dev/null || true; }
-big_files(){ git ls-files --others --ignored --exclude-standard -- "data/$1" "results/$1"; }
+big_files(){ git ls-files --others --ignored --exclude-standard -- "data/$1"; }
 run_ids(){ for r in "$@"; do basename "${r%/}"; done; }
 confirm(){ [[ $YES == 1 ]] && return; read -r -p "$1 [y/N] " a; [[ $a == [yY]* ]]; }
 undrop(){ [[ -f $DROPPED ]] && { grep -vxF "$1" "$DROPPED" > "$DROPPED.tmp" || true; mv "$DROPPED.tmp" "$DROPPED"; }; return 0; }
@@ -71,6 +71,8 @@ pull_run(){
   gh release download "$TAG" -R "$REPO" -D "$tmp" -p "$run.zip" -p "$run.zip.*" || die "$run is not on release '$TAG'"
   [[ -f $tmp/$run.zip ]] || cat "$tmp/$run.zip".* > "$tmp/$run.zip"   # parts .00 .01 ... glob in order
   unzip -q -o "$tmp/$run.zip" -d "$KX"
+  # zips pushed before 2026-10-30 hold the SfM under results/<run>/: move it into the run dir
+  if [[ -d $KX/results/$run ]]; then cp -a "$KX/results/$run/." "$KX/data/$run/"; rm -rf "${KX:?}/results/$run"; rmdir "$KX/results" 2>/dev/null || true; fi
   rm -rf "$tmp"
   undrop "$run"
   say "$run: done ($(du -sh "data/$run" | cut -f1) in data/)"
@@ -114,7 +116,7 @@ case "$cmd" in
     (($#)) || die "drop RUN..."
     for r in $(run_ids "$@"); do
       grep -qxF "$r" <(release_runs) || confirm "$r is not on the release: its large files exist only here. Drop them?" || continue
-      big_files "$r" | xargs -r -d '\n' rm -f; find "data/$r" "results/$r" -type d -empty -delete 2>/dev/null || true
+      big_files "$r" | xargs -r -d '\n' rm -f; find "data/$r" -type d -empty -delete 2>/dev/null || true
       echo "$r" >> "$DROPPED"
       say "$r: large files dropped (git and the release keep it; pull --all skips it here, data/sync.sh pull $r gets it back)"
     done;;
@@ -123,8 +125,8 @@ case "$cmd" in
     for r in $(run_ids "$@"); do
       confirm "delete $r everywhere (local files, git, release)?" || continue
       delete_assets "$r"
-      git rm -r -q --ignore-unmatch -- "data/$r" "results/$r" >/dev/null
-      rm -rf "data/$r" "results/$r"; undrop "$r"
+      git rm -r -q --ignore-unmatch -- "data/$r" >/dev/null
+      rm -rf "data/$r"; undrop "$r"
       say "$r: deleted (commit the git rm)"
     done;;
   prune)
