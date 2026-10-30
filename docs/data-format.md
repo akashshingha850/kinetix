@@ -46,8 +46,12 @@ kind: room
 roi:       {center: [1.916, 2.9, 4.616], size: [19.34, 29.8, 9.0], yaw_deg: 0}  # inner walls / floor / ceiling, map
 workspace: {center: [2.276, 2.9, 3.016], size: [15.6, 26.8, 4.0], yaw_deg: 0}   # inner box minus margins and racks
 no_fly:    [{center: [-6.944, 4.35, 1.616], size: [1.18, 16.3, 3.0], yaw_deg: 0}]  # racks (+ cart, fuse box)
-altitude_m: [1.1, 4.9]          # camera height in map (rafters from 5.8 m)
+altitude_m: auto                # camera height band from the room box (or a fixed [low, high] in map z)
 ```
+
+`altitude_m: auto` (room scenes only): the band is 1.1 m over the room box's floor to 1.0 m under its ceiling (room.yaml
+`explore.fit.altitude_above_floor_m`, `ceiling_margin_m` + 0.4; `kinetix/config.py` `altitude_band`, the same rule as a room fitted by
+exploration), and the workspace's z is set to it.
 
 ## 2. View pool — `pools/<scene>/<pool>/`
 

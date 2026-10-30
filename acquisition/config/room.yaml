@@ -29,8 +29,9 @@ planner:
     spacing_m: 2.0
     heights: auto                # camera layers fill the altitude band (fitted from the room with --explore, else the scene's
                                  # altitude_m) every <= layer_m, both band edges included; or a list of map z (until 2026-10-30:
-                                 # [1.2, 2.8, 4.4]; Warehouse band 1.1..4.9 now gives 1.1 / 2.37 / 3.63 / 4.9)
-    layer_m: 1.6
+                                 # [1.2, 2.8, 4.4])
+    layer_m: 1.0                 # dry Warehouse tour, band 1.22..8.12 (2026-10-30, one run each): 1.0 m -> coverage 0.987, 98 m,
+                                 # planned in 28 s; 1.3 / 1.6 / 2.0 / 2.4 m -> 0.963 / 0.914 / 0.963 / 0.949 (fixed 3 layers: 0.964)
     n_yaw: 12                    # every 30 deg
 
   tour:                          # method `tour` (ADR-K12): viewpoints + TSP + continuous capture
