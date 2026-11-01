@@ -19,12 +19,16 @@
 #   data/sync.sh prune [-y] [RUN...]    delete release copies of runs not in git (default: all of them)
 #
 # RUN is a run id or a path to it. Env: KX_DATA_REPO (default: this repo, akashshingha850/kinetix, private), KX_DATA_TAG (default:
-# data), TMPDIR (zips are staged there: a run needs its size free, ~7 GB for a tour). GitHub caps an asset at 2 GiB: bigger zips go up as <RUN>.zip.00, .01, ...
+# data), TMPDIR (zips are staged there: a run needs its size free, ~7 GB for a tour). Zips over PART_MB go up as <RUN>.zip.000, .001, ...
+# (older runs: .00, .01). Small parts because GitHub drops an upload idle for 60 s (HTTP 408) and the lab uplink black-holes one
+# TCP flow for ~70 s every minute or two (2026-11-01, ss -ti: RTO backoff to 34 s): a stall costs one part, which is retried.
+# Parts go up as <name>.part and are renamed once all are up, so an interrupted push never looks like a complete run.
 set -euo pipefail
 
 KX="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TAG="${KX_DATA_TAG:-data}"
-PART_MB=1900
+PART_MB=50
+TRIES=10
 DROPPED=data/.dropped
 
 say(){ printf '\033[1;36m[sync]\033[0m %s\n' "$*"; }
@@ -36,7 +40,8 @@ REPO="${KX_DATA_REPO:-akashshingha850/kinetix}"   # this repo's own release: pri
 STAGE=$(mktemp -d); trap 'rm -rf "$STAGE"' EXIT
 
 assets(){ gh release view "$TAG" -R "$REPO" --json assets -q '.assets[] | "\(.name) \(.size)"' 2>/dev/null || true; }
-release_runs(){ assets | awk '{print $1}' | sed -E 's/\.zip(\.[0-9]+)?$//' | sort -u; }
+release_runs(){ assets | awk '{n = $1; p = sub(/\.part$/, "", n); sub(/\.zip(\.[0-9]+)?$/, "", n); if (p) part[n]; else ok[n]}  # .part: unfinished
+  END {for (r in ok) if (!(r in part)) print r}' | sort -u; }
 git_runs(){ git ls-files 'data/*/run.yaml' | cut -d/ -f2 | sort -u; }
 local_runs(){ for d in data/*/; do r=$(basename "$d"); [[ -f $d/run.yaml || -n $(big_files "$r") ]] && echo "$r"; done | sort -u; }
 dropped(){ sort -u "$DROPPED" 2>/dev/null || true; }
@@ -44,9 +49,12 @@ big_files(){ git ls-files --others --ignored --exclude-standard -- "data/$1"; }
 run_ids(){ for r in "$@"; do basename "${r%/}"; done; }
 confirm(){ [[ $YES == 1 ]] && return; read -r -p "$1 [y/N] " a; [[ $a == [yY]* ]]; }
 undrop(){ [[ -f $DROPPED ]] && { grep -vxF "$1" "$DROPPED" > "$DROPPED.tmp" || true; mv "$DROPPED.tmp" "$DROPPED"; }; return 0; }
+retry(){ local i; for i in 1 2 3 4 5; do "$@" && return; say "retrying $1 in 30 s"; sleep 30; done; "$@"; }  # api.github.com drops out too
 
-delete_assets(){ for a in $(assets | awk -v r="$1" '$1 == r".zip" || index($1, r".zip.") == 1 {print $1}'); do
-  gh release delete-asset "$TAG" "$a" -R "$REPO" -y >/dev/null; done; }
+# the API also lists failed uploads (state "starter"), which `gh release view` hides and which block a re-upload of that name
+release_assets(){ gh api --paginate "repos/$REPO/releases/$(gh api "repos/$REPO/releases/tags/$TAG" -q .id)/assets" -q '.[] | "\(.id) \(.name)"'; }
+delete_assets(){ release_assets | awk -v r="$1" '$2 == r || $2 == r".zip" || index($2, r".zip.") == 1 {print $1}' |  # RUN or one asset name
+  while read -r a; do gh api -X DELETE "repos/$REPO/releases/assets/$a" >/dev/null; done; }
 
 push_run(){
   local run=$1 files tmp="$STAGE/$1"
@@ -56,16 +64,30 @@ push_run(){
   say "$run: zipping $(wc -l <<<"$files") files"
   zip -q -1 "$tmp/$run.zip" -@ <<<"$files"                   # paths relative to the repo root: pull unzips in place
   if (( $(stat -c %s "$tmp/$run.zip") > PART_MB * 1024 * 1024 )); then
-    split -b "${PART_MB}M" -d -a 2 "$tmp/$run.zip" "$tmp/$run.zip." && rm "$tmp/$run.zip"
+    split -b "${PART_MB}M" -d -a 3 "$tmp/$run.zip" "$tmp/$run.zip." && rm "$tmp/$run.zip"
   fi
-  delete_assets "$run"                                       # the old copy may have more parts
+  for f in "$tmp"/*; do mv "$f" "$f.part"; done
+  retry delete_assets "$run"                                 # the old copy may have more parts
   say "$run: uploading $(du -sh "$tmp" | cut -f1) ($(ls "$tmp" | wc -l) asset(s))"
-  gh release upload "$TAG" "$tmp"/* -R "$REPO"
+  for f in "$tmp"/*; do
+    for ((try = 1; ; try++)); do
+      gh release upload "$TAG" "$f" -R "$REPO" && break
+      (( try < TRIES )) || die "$run: $(basename "$f") failed $TRIES times; push again to retry the run"
+      say "$run: retrying $(basename "$f") ($try/$TRIES failed)"
+      sleep 10                                                 # the uplink also drops out for a few seconds
+      delete_assets "$(basename "$f")" || true                 # the failed upload's starter asset blocks its name
+    done
+  done
+  retry finish_run "$run"
   rm -rf "$tmp"
 }
 
+finish_run(){ release_assets | awk -v r="$1" 'index($2, r".zip") == 1 && $2 ~ /\.part$/' | while read -r id name; do
+  gh api -X PATCH "repos/$REPO/releases/assets/$id" -f name="${name%.part}" >/dev/null; done; }
+
 pull_run(){
   local run=$1 tmp="$STAGE/$1"
+  grep -qxF "$run" <(release_runs) || die "$run is not (completely) on release '$TAG'"
   mkdir -p "$tmp"
   say "$run: downloading"
   gh release download "$TAG" -R "$REPO" -D "$tmp" -p "$run.zip" -p "$run.zip.*" || die "$run is not on release '$TAG'"
