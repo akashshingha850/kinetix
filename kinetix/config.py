@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import os
 from pathlib import Path
 
 import numpy as np
@@ -13,6 +14,17 @@ ROOT = Path(__file__).resolve().parents[1]          # repo root (kinetix/config.
 CONFIG = ROOT / "acquisition" / "config"          # common.yaml, then object.yaml or room.yaml by the scene's kind (ADR-K11)
 SCENES = ROOT / "kinetix" / "scenes"                # scene files, shared: acquisition flies them, reconstruction scores against them
 DATA = ROOT / "data"                                # run dirs: acquisition writes the flight, reconstruction its <method>/ subdirs
+
+
+def kinetix_data() -> Path:
+    """$KINETIX_DATA (scenes, pools, bench; data-format.md): the environment, else the repo's .env, else ~/kinetix-data."""
+    v = os.environ.get("KINETIX_DATA")
+    env = ROOT / ".env"
+    if not v and env.exists():
+        for line in env.read_text().splitlines():
+            if line.startswith("KINETIX_DATA="):
+                v = line.split("=", 1)[1].split("#")[0].strip()
+    return Path(v or "~/kinetix-data").expanduser()
 
 
 def merge(a: dict, b: dict) -> dict:

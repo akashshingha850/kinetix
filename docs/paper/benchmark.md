@@ -12,7 +12,7 @@ the strongest baseline. It is not the headline claim, because ~53–72 % savings
 |---|---|
 | Scenes | K2: 3 sim objects. Paper: 8–10 sim objects spanning texture (rich/poor), geometry (convex/concave/thin parts), size (0.3–2 m), material (matte/glossy), **at least 3 drawn from Objaverse++ / GSO / OmniObject3D** so the set overlaps community pools (ObjView-Bench), plus 3 real objects (K6). Asset licences are checked before the set is fixed |
 | Pools | `rings:4x60` (main) and **`tammes:128`** (ObjView-Bench-compatible 128-view sphere with drone reachability masks: nothing below the floor or inside walls), each with a held-out test split |
-| Methods | **fixed patterns:** `orbit_1ring`, `orbit_3ring` (dense multi-ring at matched GSD, the one that counts), `grid_hemisphere` (CPP-style) · **simple adaptive:** `random`, `fvs` (farthest-view sampling, strong per NeRF Director) · **classical NBV:** `volumetric_ig` (unobserved/rear-side voxel entropy on the same TSDF, Isler/Delmerico family) · **radiance-field:** `fisherrf` (RGB-only, offline over the pool) · **learned:** `ma_scvp` (public code, pool-native; `gennbv` as an alternative) · `explore_exploit` (orbit seed, then weak-region coverage; if K3 time allows) · `coverage_oracle` (upper bound, uses GT) · `kinetix_combo` + ablations. Hestia / VIN-NBV / ActMVS only if their code runs |
+| Methods | **fixed patterns:** `orbit_1ring` (= `orbit`), `orbit_3ring` (dense multi-ring at matched GSD, the one that counts; = `orbit_rings`, every ring of the ring stack in golden-angle order), `grid_hemisphere` (CPP-style) · **simple adaptive:** `random`, `fvs` (farthest-view sampling, strong per NeRF Director) · **classical NBV:** `volumetric_ig` (unobserved/rear-side voxel entropy on the same TSDF, Isler/Delmerico family) · **radiance-field:** `fisherrf` (RGB-only, offline over the pool) · **learned:** `ma_scvp` (public code, pool-native; `gennbv` as an alternative) · `explore_exploit` (orbit seed, then weak-region coverage; first version = method `surface_normal`, 2026-10-31) · `coverage_oracle` (upper bound, uses GT) · `kinetix_combo` + ablations. Hestia / VIN-NBV / ActMVS only if their code runs |
 | Sensing (ADR-K07) | `mono` (Kinetix), `mono_noprior`, `stereo_plan`, `stereo_full`, `oracle_depth`. Baselines run with `left` and `stereo_rig` reconstruction input, so a stereo baseline exists for every stereo Kinetix row. `zed_mapping` (ZED SDK spatial-mapping mesh on an orbit) on T2/T3 only |
 | Budgets | images N ∈ {5, 10, 20, 30, 40, 80} (includes ObjView-Bench's K=5/30) and `stop: gain_plateau` (free mode) |
 | Tier | T0 for the full matrix. A T1 and T2 subset for transfer. T3 for real |
@@ -62,7 +62,13 @@ Thresholds are relative to the ROI diagonal `D`, so objects of different sizes a
 | cost | images, travel distance (m), flight time (T2/T3, s), planning time per step (s) |
 
 Sanity guards are run by `evaluate.py` on every evaluation: if alignment residual > 5 % of D, or
-registered fraction < 50 %, the run is marked `eval_valid: false` and kept out of means (reported as failure count).
+registered fraction < 50 %, the run is marked `eval_valid: false`. It counts as F = 0 in means and N@q (a failed reconstruction
+has reached no quality; dropping it would favour methods that fail often) and is reported as a failure count. Changed 2026-11-01
+from "kept out of means".
+
+Status 2026-11-01 (`kinetix bench`, `config/bench/baselines.yaml`): scenes `office_buddha`, `office_monster`, `office_chair`; pools =
+the 192-view ring stack, not yet `rings:4x60` / `tammes:128`; reference = `orbit_rings` over the whole pool, sensitivity at 50/75/100 %
+of it instead of 120/240/360 views; evaluation on **sparse** SfM points (no densify yet), which caps recall; seeds 3.
 
 ## 4. Ablations (K3+)
 

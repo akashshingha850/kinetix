@@ -23,5 +23,6 @@ altitude_m: auto                 # camera height band from the room box: 1.1 m o
 standby: [0.0, 0.0, 1.2]         # camera position after takeoff: straight above the spawn point
 gt_mesh: null
 sim:
+  world: Warehouse                  # the bisg world preset this scene is (bisg /sim/scenario "world"; the MRGCS bridge matches it)
   world_to_map: [2.376, 0.0, 0.116] # Pegasus state/pose (world) -> map, measured on the ground 2026-10-17 (EKF2 body - Pegasus
                                     # body: x = the ZED odometry origin 12 cm ahead of the body); the rig re-measures it at start

@@ -391,6 +391,11 @@ class MavrosRig:
             p, q = self.body
         return camera_from_body(p, q, self.t_base_cam, self.mount_pitch)
 
+    def move_to(self, target: Pose) -> None:
+        """Transit: reach the camera pose (position and yaw tolerances, no settle time), no image."""
+        yaw = camera_yaw(target)
+        self._goto_body(body_from_camera(target.p, yaw, self.t_base_cam), yaw, self.rc["move_timeout_s"], settle_s=0.0)
+
     def capture_at(self, target: Pose, idx: int, pool_id: str | None = None) -> Frame:
         yaw = camera_yaw(target)
         with self.lock:

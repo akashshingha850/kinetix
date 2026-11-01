@@ -1,0 +1,48 @@
+[     0.0s] run 261031-214529_office_buddha_surface_normal: scene office_buddha (object), method surface_normal, rig mavros, budget 20
+[     0.0s] coverage model: 2928 surface points, 0 occluders
+[    21.6s] scene shifted by [0.002, 0.0, 0.149] m (measured map origin vs the scene's world_to_map)
+[    21.6s] coarse 0: -> r1.60_z1.35_a180
+[    31.3s] frame 0: coverage 0.000, pose err 0.044 m
+[    31.3s] coarse 1: -> r1.60_z1.35_a225
+[    44.8s] frame 1: coverage 0.203, pose err 0.035 m
+[    44.8s] coarse 2: -> r1.60_z1.35_a270
+[    58.0s] frame 2: coverage 0.319, pose err 0.038 m
+[    58.0s] coarse 3: -> r1.60_z1.35_a315
+[    71.1s] frame 3: coverage 0.323, pose err 0.044 m
+[    71.1s] coarse 4: -> r1.60_z1.35_a000
+[    84.8s] frame 4: coverage 0.535, pose err 0.052 m
+[    84.8s] coarse 5: -> r1.60_z1.35_a045
+[    95.6s] frame 5: coverage 0.542, pose err 0.077 m
+[    95.6s] coarse 6: -> r1.60_z1.35_a090
+[   108.9s] frame 6: coverage 0.660, pose err 0.059 m
+[   108.9s] coarse 7: -> r1.60_z1.35_a135
+[   122.8s] frame 7: coverage 0.668, pose err 0.038 m
+[   123.4s] coarse model: 507846 points, 275 patches -> 250 viewpoints, 105 feasible -> 12 after grouping (standoff 0.8 m)
+[   123.4s] fine 8: -> x1.66_y0.21_z1.05_h356
+[   133.4s] frame 8: coverage 0.668, pose err 0.062 m
+[   133.4s] fine 9: -> x1.68_y0.12_z1.44_h355
+[   140.2s] frame 9: coverage 0.668, pose err 0.044 m
+[   140.2s] fine 10: -> x1.68_y-0.30_z1.12_h013
+[   148.8s] frame 10: coverage 0.668, pose err 0.047 m
+[   177.0s] fine 11: round the object via 4 transit poses
+[   177.0s] fine 11: -> x2.52_y-1.10_z1.12_h088
+[   185.6s] frame 11: coverage 0.668, pose err 0.043 m
+[   185.6s] fine 12: -> x3.08_y-0.86_z1.23_h128
+[   194.5s] frame 12: coverage 0.668, pose err 0.049 m
+[   214.9s] fine 13: round the object via 3 transit poses
+[   214.9s] fine 13: -> x3.43_y-0.28_z1.01_h171
+[   224.0s] frame 13: coverage 0.668, pose err 0.036 m
+[   224.0s] fine 14: -> x3.46_y-0.11_z1.39_h178
+[   231.4s] frame 14: coverage 0.668, pose err 0.026 m
+[   231.4s] fine 15: -> x3.46_y-0.05_z1.27_h176
+[   236.6s] frame 15: coverage 0.668, pose err 0.016 m
+[   236.6s] fine 16: -> x3.45_y0.27_z1.05_h186
+[   244.5s] frame 16: coverage 0.668, pose err 0.028 m
+[   244.5s] fine 17: -> x3.37_y0.53_z1.38_h203
+[   252.8s] frame 17: coverage 0.668, pose err 0.040 m
+[   273.0s] fine 18: round the object via 3 transit poses
+[   273.0s] fine 18: -> x2.77_y1.07_z1.08_h257
+[   281.8s] frame 18: coverage 0.668, pose err 0.046 m
+[   281.8s] fine 19: -> x2.41_y1.09_z1.08_h279
+[   290.0s] frame 19: coverage 0.668, pose err 0.027 m
+[   330.9s] run closed: {'frames': 20, 'registered': None, 'travel_m': 18.85, 'wall_s': 330.9, 'sim_s': None, 'stop_reason': 'budget', 'coverage': 0.6677, 'seen': 0.7339, 'map_shift': [0.0016, 0.0003, 0.1489]}

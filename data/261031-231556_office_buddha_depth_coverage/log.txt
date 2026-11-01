@@ -1,0 +1,9 @@
+[     0.0s] run 261031-231556_office_buddha_depth_coverage: scene office_buddha (object), method depth_coverage, rig isaac, budget 20
+[     0.0s] coverage model: 2928 surface points, 0 occluders
+[     0.2s] step 0: -> r1.60_z1.35_a180 gain 0.089 (112/192 feasible)
+[     0.4s] frame 0: 520 surface pts in view, coverage 0.000 (seen 0.178), pose err 0.000 m
+[     0.5s] step 1: -> r1.60_z1.00_a180 gain 0.208 (95/192 feasible)
+[     0.6s] frame 1: 700 surface pts in view, coverage 0.178 (seen 0.239), pose err 0.000 m
+[     0.6s] step 2: -> r1.20_z1.00_a180 gain 0.012 (94/192 feasible)
+[     0.8s] frame 2: 580 surface pts in view, coverage 0.190 (seen 0.239), pose err 0.000 m
+[     1.0s] run closed: {'frames': 3, 'registered': None, 'travel_m': 1.66, 'wall_s': 1.0, 'sim_s': None, 'stop_reason': 'no_feasible_view', 'coverage': 0.1899, 'seen': 0.2391}

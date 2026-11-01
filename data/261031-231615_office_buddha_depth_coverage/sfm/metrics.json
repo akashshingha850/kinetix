@@ -1,0 +1,49 @@
+{
+ "n_frames": 13,
+ "pose_source": "sfm",
+ "pairing": "exhaustive",
+ "pairs": 78,
+ "rig_check": {
+  "kept": 65,
+  "unchecked": 0,
+  "dropped_rotation": 12,
+  "dropped_direction": 0,
+  "max_rot_deg": 5.0,
+  "max_dir_deg": 30.0,
+  "min_baseline_m": 0.5
+ },
+ "position_priors": {
+  "n": 13,
+  "sigma_m": 0.5
+ },
+ "registered": 13,
+ "registered_frac": 1.0,
+ "models": 1,
+ "models_sizes": [
+  13
+ ],
+ "points3D": 1342,
+ "mean_track_length": 4.33,
+ "mean_reproj_error_px": 0.427,
+ "time_s": {
+  "features": 0.7,
+  "matching": 0.2,
+  "mapping": 0.4,
+  "total": 1.2
+ },
+ "ate_vs_ekf2": {
+  "rmse_m": 0.001,
+  "median_m": 0.0007,
+  "max_m": 0.0021,
+  "scale": 1.0,
+  "n": 13
+ },
+ "ate_vs_gt": {
+  "rmse_m": 0.001,
+  "median_m": 0.0007,
+  "max_m": 0.0021,
+  "scale": 1.0,
+  "n": 13
+ },
+ "ekf2_vs_gt_m": 0.0
+}

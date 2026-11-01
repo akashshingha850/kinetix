@@ -18,11 +18,17 @@ $KINETIX_DATA/
 
 ```
 scene.yaml
-scene.usd          room + object (+ lights), loaded by bisg sim via world.usd_path (Q3)
-object.usd         the object alone (provenance: source asset, licence)
-gt_mesh.ply        object surface in map frame, metres (exported from object.usd at its placed pose)
+scene.usd          room (referenced by URL) + object + lights, the bisg world (bisg mounts $KINETIX_DATA/scenes at /scenes: SCENES_DIR)
+bisg.yaml          bisg locator: extends bisg's docker/sim/sim.yaml with this world, spawn and lighting (`./bisg all headless -c <it>`)
+object.usd         the object alone + textures/ (provenance: source asset, licence)
+gt_mesh.ply        object surface in map frame, metres (the placed object.usd triangles)
 gt_observable.ply  GT points visible from at least one feasible pose (raycast), used for completeness
 ```
+
+A scene folder is built, never edited: `uv run python sim/build_scene.py sim/scenes/<name>.yaml` (the recipe in git: room USD,
+object source + licence, placement, spawn, world_to_map, lights). `scene.yaml` then also carries `source.room`, `gt_observable` and
+`sim.bisg` (the locator file). A scene in a bisg world preset says which in `sim.world` (`Warehouse`, `Simple Room`); bisg publishes
+the loaded one on `/sim/scenario`, and the MRGCS Kinetix tab flies only that scene. First scene: `office_buddha` (Smithsonian Cosmic Buddha scan, CC0, in the Isaac Office lobby).
 
 ```yaml
 # scene.yaml
@@ -55,6 +61,11 @@ exploration), and the workspace's z is set to it.
 
 ## 2. View pool — `pools/<scene>/<pool>/`
 
+Built: `kinetix pool make --scene <scene dir>` writes `pools/<scene>/rings/` (2026-11-01): the planner's ring-stack candidates
+(object.yaml `planner.rings`, ids = candidate `pool_id`, e.g. `r1.20_z1.35_a180`), rendered by `render_server.sh batch` (left, right,
+GT depth; no `zed/`, no test split yet). The pool rig (`--rig pool`) serves a candidate by its id; a changed `planner.rings` needs a
+new pool. `tammes:128` is not built.
+
 ```
 pool.yaml
 views.jsonl        one view per line
@@ -69,7 +80,7 @@ zed_conf/<id>.npy  float32 0–100 SDK confidence (higher = less confident; > de
 ```yaml
 # pool.yaml
 scene: chair_01
-generator: {tool: render_server, git: <sha>, layout: "rings:4x60", seed: 0}   # or "tammes:128" (ObjView-Bench-compatible)
+generator: {tool: render_server, git: <sha>, layout: rings, rings: {radii: [..], heights: [..], n_az: 24}}   # or "tammes:128" (planned)
 camera: {width: 1280, height: 720, fx: 529.8, fy: 529.8, cx: 640, cy: 360, mount_pitch_deg: 0, baseline_m: 0.063}
 stereo_cache: {model: foundation_stereo, version: "<tag>"}   # absent until first computed
 renderer: {isaac: 6.0.0, mode: RaytracedLighting, settle_frames: 3}
@@ -108,6 +119,10 @@ Acquisition writes `data/<run_id>/`; reconstruction reads it and adds one subdir
 
 ```
 data/<run_id>/sfm/          offline SfM over all frames (`kinetix sfm`: database.db, pairs.txt, sparse/<k>/, points.ply in map, metrics.json)
+                            + eval.json (`kinetix eval`: the sparse model scored against GT, the metrics.json keys below)
+data/<run_id>/sfm_n<N>/     eval.json of the first N frames only (bench budget curves; mapped from sfm/database.db, model not kept)
+data/<run_id>/dense/        fused.ply (COLMAP patch-match + fusion of sfm/'s model, reconstruction/densify.py) + eval.json on it
+data/<run_id>/dense_n<N>/   the same for the first N frames (mvs/fused.ply + eval.json; depth maps and model not kept)
 data/<run_id>/<method>/     dense.ply | mesh.ply | gs/ (per densifier) + metrics.json (`kinetix eval`)
 ```
 
@@ -116,13 +131,15 @@ data/<run_id>/<method>/     dense.ply | mesh.ply | gs/ (per densifier) + metrics
 kinetix: {git: <sha>, dirty: false, version: 0.1.0}
 env: {host: ict-em018kc6, gpu: "RTX 6000 Ada", torch: 2.11.0, pycolmap: 4.2.1, isaac: 6.0.0}
 scene: chair_01
+scene_path: /opt/kinetix-data/scenes/chair_01   # the scene file the run flew (kinetix sfm / eval read GT from it)
 rig: {name: pool, pool: rings_4x60}
 method: kinetix_combo
 sensing: {preset: mono, plan_depth: mono, recon_input: left, depth_model: da_v2_base}
 uses_gt: false            # true if the scorer OR the depth source reads GT
 seed: 0
 config: { ... the full resolved config ... }
-summary: {frames: 24, registered: 24, travel_m: 31.2, wall_s: 210.4, sim_s: null, stop_reason: gain_plateau}
+summary: {frames: 24, registered: 24, travel_m: 31.2, wall_s: 210.4, sim_s: null, stop_reason: gain_plateau,
+          map_shift: [0.122, 0.003, -0.208]}   # mavros rig: measured - scene world_to_map; scene GT (gt_mesh, roi) + map_shift = this run's map
 ```
 
 ```json
@@ -149,9 +166,14 @@ Readers must ignore unknown keys. Writers add keys and never repurpose them. A b
 ## 4. Benchmark — `bench/<matrix>/`
 
 ```
-matrix.yaml        scenes × methods × budgets × seeds (copy of the input)
+matrix.yaml        scenes × methods × budgets × seeds (copy of the input, config/bench/<name>.yaml)
+runs/<run_id>/     the bench's sessions (run directories, §3)
+cells/<cell>.json  the rows of one scene × method × seed cell (a rerun skips finished cells; <cell>.err = a failed one's traceback)
+                   (matrix `runs_from: <bench>`: the sessions are that bench's runs/ — paired, e.g. dense vs sparse scoring of the same images;
+                   matrix `densify: {backend: colmap_mvs, ...}`: rows score dense points, `eval.densify` says which)
+validate.json      V3 proxy validity (`python -m bench.validate <dir>`, methodology.md §4): Spearman rho of GT coverage vs measured
 runs.txt           run ids belonging to this benchmark
-results.csv        one row per run: run id, scene, method, sensing preset, budget, seed + every metrics.json scalar
+results.csv        one row per cell and budget: scene, label, method, rig, seed, budget, n_images, run id + the eval.json scalars
 report.md          tables + efficiency curves (figures/*.png)
 ```
 

@@ -27,18 +27,26 @@ def _git(root: Path) -> dict:
 
 class RunLog:
     def __init__(self, out_root: Path | str, scene: str, method: str, rig: str, seed: int, cfg: dict, uses_gt: bool,
-                 repo_root: Path | None = None, tag: str = ""):
+                 repo_root: Path | None = None, tag: str = "", scene_path: Path | str | None = None):
         # tag (e.g. explore-opt) only names the run dir; rig and seed are in run.yaml, not the name (data-format.md §3)
         self.run_id = f"{time.strftime('%y%m%d-%H%M%S')}_{scene}_{method}{'-' + tag if tag else ''}"
+        base, k = self.run_id, 1
+        Path(out_root).mkdir(parents=True, exist_ok=True)
+        while True:                                         # two runs of one scene+method in the same second (parallel bench seeds)
+            try:
+                (Path(out_root) / self.run_id).mkdir()
+                break
+            except FileExistsError:
+                k += 1
+                self.run_id = f"{base}-{k}"
         self.dir = Path(out_root) / self.run_id
-        # shortcut: two runs of one scene+method in the same second collide (raises), add a suffix if parallel benches need it
-        self.dir.mkdir(parents=True)
         (self.dir / "frames").mkdir()
         self.t0 = time.time()
         self.frames = 0
         self.travel_m = 0.0
         self.head = {"format": FORMAT, "kinetix": {"version": "0.1.0", **(_git(repo_root) if repo_root else {})},
-                     "env": {"host": platform.node()}, "scene": scene, "rig": {"name": rig}, "method": method,
+                     "env": {"host": platform.node()}, "scene": scene,
+                     **({"scene_path": str(scene_path)} if scene_path else {}), "rig": {"name": rig}, "method": method,
                      "sensing": {"preset": "mono", "plan_depth": "none", "recon_input": "left"},
                      "uses_gt": uses_gt, "seed": seed, "config": cfg}
         self._write_run_yaml()

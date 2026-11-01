@@ -3,6 +3,8 @@
 coverage:
   spacing_m: 0.04                # surface sample spacing on the ROI box
   depth_range_m: [0.2, 4.0]
+  match_max_deg: 30.0            # two rays triangulate a point only if SIFT can still match them (beyond ~30-40 deg it fails)
+  min_overlap: 0.2               # a view must share this much of its view, matchably, with what is seen (or it cannot register)
 
 planner:
   budget: 20                     # images
@@ -17,6 +19,22 @@ planner:
     radii: [1.2, 1.6]
     heights: [1.0, 1.35, 1.7, 2.0]
     n_az: 24
+  surface:                       # `surface_normal` baseline (planner/surface.py, after Liu et al. 2026): coarse orbit -> ZED-depth
+    coarse_views: 8              # surface patches -> one viewpoint per patch along its normal -> grouped to the budget -> ordered
+    coarse_radius: 1.6           # the coarse ring: radius from the ROI axis (m) and map height
+    coarse_height: 1.35
+    patch_m: 0.10                # surface patch size (the paper's mesh faces): centroid + plane-fit normal each
+    floor_margin_m: 0.10         # depth points this close above the ROI box floor are the floor, not the object
+    standoff_m: 0.8              # camera distance along the patch normal (inside the scene's standoff_m band)
+    max_normal_z: 0.7            # level camera: patches facing up/down more than this get no viewpoint
+    yaw_cost_m: 0.5              # visiting order: metres per radian of turn (nearest neighbour + 2-opt, legs through the ROI shell barred)
+  depth_surface:                 # `depth_coverage`: after this many views, plan on the surface their ZED depth shows
+    after_views: 4
+    floor_margin_m: 0.10
+    min_points: 10               # depth points a 4 cm patch needs for a normal
+  volumetric_ig:                 # `volumetric_ig` baseline (planner/scorers): occupancy map over the ROI from the frames' depth
+    voxel_m: 0.04
+    rays: [40, 24]               # rays cast per candidate view (image grid)
   orbit:                         # `orbit` baseline: the ring closest to this radius/height
     radius: 1.2
     height: 1.35

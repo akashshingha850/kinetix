@@ -1,0 +1,57 @@
+# Scene recipe (data-format.md §1): `uv run python sim/build_scene.py sim/scenes/office_buddha.yaml` writes
+# $KINETIX_DATA/scenes/office_buddha/ (scene.yaml, scene.usd, object.usd + textures, gt_mesh.ply, gt_observable.ply, bisg.yaml).
+# Fly it: `./bisg all headless -c $KINETIX_DATA/scenes/office_buddha/bisg.yaml` in bisg_isaac, then
+# `kinetix run --scene $KINETIX_DATA/scenes/office_buddha ...`.
+#
+# One textured, non-convex object in a furnished, textured room: the Smithsonian "Cosmic Buddha" laser scan (1.51 m, carved
+# reliefs all over, hollow sleeve ends) on the floor of the Isaac Office lobby (information desk, stanchions, stairs, sofa).
+# Office geometry measured 2026-10-31 from its USD (every mesh, instance proxies included): floor z 0.00, ceiling fittings 2.97
+# over the lobby; a free disc of radius 4.5 m around (-10.25, -7.25) between z 0.1 and 2.8, and no geometry inside the
+# workspace square (half 2.8 m) widened by the object clearance 0.35 m.
+name: office_buddha
+
+room:
+  usd: https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Environments/Office/office.usd
+  licence: CC BY 4.0 (NVIDIA, LICENSE beside the asset)
+  floor_z: 0.0                   # world
+
+object:
+  gltf_zip: https://3d-api.si.edu/content/document/3d_package:d8c62be8-4ebc-11ea-b77f-2e728ce88125/resources/cosmic-buddha-laser-scan-150k-gltf.zip
+  title: "Buddha draped in robes portraying the Realms of Existence (Cosmic Buddha), Freer Gallery F1923.15, laser scan 150k"
+  dataset: smithsonian
+  licence: CC0 (Smithsonian Open Access, public domain)
+  redistributable: true
+  unit_m: 0.001                  # the glTF is in millimetres, Y up
+  position: [-10.25, -7.25, 0.0] # world: base centre on the lobby floor
+  yaw_deg: -90                   # glTF +Z (the carved front) -> world -x, facing the spawn
+
+spawn: {position: [-12.75, -7.25, 0.11], yaw_deg: 0.0}   # world, 2.5 m west of the object, facing it; floor 0.00 + 0.11 rest height
+# map = world + world_to_map: EKF2's origin is the body at the spawn. Measured by the mavros rig on 2026-10-31
+# (run 261031-012800); x, y follow the spawn exactly, z varies by ~0.2 m between runs (the Warehouse runs too), so every run
+# re-measures it and records the difference as run.yaml summary.map_shift (gt_mesh + map_shift = that run's map).
+world_to_map: [12.75, 7.25, -0.092]
+
+workspace_half_m: 2.8            # camera xy within +-2.8 m of the object (the free square, see above)
+altitude_m: [0.616, 2.316]       # camera z in map: 0.5..2.2 m over the floor (0.8 m under the 2.97 m ceiling fittings)
+standoff_m: [0.6, 2.0]           # camera distance to the object surface
+roi_margin_m: 0.05
+
+observable:                      # gt_observable.ply: GT points seen from at least one feasible camera position
+  spacing_m: 0.005               # GT surface sample spacing
+  grid_m: 0.25                   # candidate camera positions: workspace grid, kept where standoff_m holds
+  max_cameras: 800
+  vfov_deg: 68.4                 # ZED Mini HD720 (fy 529.8, data-format.md §2 pool camera)
+  mount_pitch_deg: 0.0           # Q1 is open: level camera
+  max_incidence_deg: 80.0
+
+# The Office's 119 lamps are authored invisible (dark lobby, lit only by its dome light and emissive panels), so the scene
+# brings its own: exhibit-style ceiling panels around the object (world, just under the 2.97 m fittings), shining down.
+lights:
+  - {position: [-11.75, -7.25, 2.9], size: [1.2, 0.6], intensity: 8000}   # in front (spawn side)
+  - {position: [-8.75, -7.25, 2.9], size: [1.2, 0.6], intensity: 8000}    # behind
+  - {position: [-10.25, -8.75, 2.9], size: [0.6, 1.2], intensity: 8000}   # sides
+  - {position: [-10.25, -5.75, 2.9], size: [0.6, 1.2], intensity: 8000}
+
+sim:                             # bisg locator keys for this world (bisg docs/configuration.md)
+  light_scale: 1.0               # x every light in the world (the Office's own are invisible, so: ours)
+  ambient_light: 1.0             # RTX ambient fill (the Warehouse uses 2.0)

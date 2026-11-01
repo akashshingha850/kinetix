@@ -74,6 +74,7 @@ class Rig(Protocol):
     def start(self) -> None: ...
     def pose(self) -> Pose: ...
     def capture_at(self, target: Pose) -> Frame: ...      # move, settle, grab; raises RigError
+    def move_to(self, target: Pose) -> None: ...          # move and reach it, no image (transit legs around the object); raises RigError
     def fly_path(self, path: list[Pose], step_m: float, step_yaw: float,
                  on_frame: Callable[[Frame], None]) -> None: ...  # rooms (ADR-K12): fly camera poses without stopping, keyframe
                                    # every step_m / step_yaw of camera motion; raises RigError (no_image, timeout, aborted)
@@ -171,6 +172,11 @@ run per drone. When bisg ships a `vehicle/cmd` goto, `MavrosRig` switches to it 
 
 ## 5. T1 render server (`sim/render_server.py` ↔ `acquisition/rig/isaac_render.py`)
 
+Built 2026-10-31 (batch + serve, no `--zed-depth` yet): `scripts/render_server.sh serve|batch <scene>` runs it in bisg's
+`sim-headless` service (stop the flight sim first); `kinetix run --rig isaac` is the serve client. Settle = 10 rendered frames per
+view (60 for a session's first: textures stream in, and at 4 the denoiser left the first frame grainy and dark). The lighting is
+the scene's bisg locator, the map frame its `sim.world_to_map` (exact: no EKF2). ~0.15-0.3 s per view.
+
 Runs inside `bisg/sim:6.0.0` with a Kinetix scene USD. No drone, no PX4: a free camera with the
 ZED Mini intrinsics from `pool.yaml` / config.
 
@@ -191,11 +197,15 @@ ZED Mini intrinsics from `pool.yaml` / config.
 
 ```
 kinetix check                                    # = scripts/check_env.py
-kinetix pool make  --scene S --layout rings:4x60|tammes:128 [--test-split 0.1]   # views.jsonl → T1 batch render
-kinetix run   --scene S --method M --sensing mono|stereo_plan|... --rig pool|isaac|mavros --seed K [key=value ...]  → data/<id>/
-kinetix depth-study --scene S --sources stereo_learned,mono,gt [--zed]  → docs/paper/research/depth-study.md data
-kinetix eval  data/<id> [--densify gsplat|colmap_mvs]                  → data/<id>/<method>/metrics.json
-kinetix bench --matrix config/bench/<name>.yaml [--jobs N]             → bench/<name>/report.md
+kinetix pool make  --scene S [--out DIR] [--views-only] [key=value ...]   # ring-stack views.jsonl → T1 batch render (built)
+kinetix run   --scene S --method M --rig dry|pool|isaac|mavros [--pool DIR] --seed K [key=value ...]  → data/<id>/ (built)
+kinetix sfm   data/<id> [--pose-source sfm|prior] [--pairing ...]      → data/<id>/sfm/ (built)
+kinetix eval  data/<id> [--scene S]                                    → data/<id>/sfm/eval.json (built, sparse points)
+kinetix bench --matrix config/bench/<name>.yaml [--jobs N] [--out DIR]  → $KINETIX_DATA/bench/<name>/report.md (built)
+kinetix bench --report DIR [DIR ...] [--out DIR]                       → report.md over several benches (tier comparison)
+kinetix run   ... --sensing mono|stereo_plan|...                       (planned, K3)
+kinetix depth-study --scene S --sources stereo_learned,mono,gt [--zed]  (planned)
+kinetix eval  data/<id> --densify gsplat|colmap_mvs                    → data/<id>/<method>/metrics.json (planned)
 ```
 
 Exit code 0 = success; non-zero on any failed step, so the CLI is scriptable from tests and bench.

@@ -12,6 +12,7 @@ class Rig(Protocol):
     def start(self) -> None: ...
     def pose(self) -> Pose: ...
     def capture_at(self, target: Pose, idx: int, pool_id: str | None = None) -> Frame: ...   # move, settle, grab
+    def move_to(self, target: Pose) -> None: ...      # move and reach it, no image (transit)
     def finish(self) -> None: ...
 
 
@@ -23,4 +24,10 @@ def load_rig(name: str, cfg: dict, scene, run_dir, truth=None):
     if name == "mavros":
         from acquisition.rig.mavros import MavrosRig
         return MavrosRig(cfg, scene, run_dir)
-    raise ValueError(f"unknown rig {name!r} (dry | mavros)")
+    if name == "pool":
+        from acquisition.rig.pool import PoolRig
+        return PoolRig(cfg, scene, run_dir)
+    if name == "isaac":
+        from acquisition.rig.isaac_render import IsaacRenderRig
+        return IsaacRenderRig(cfg, scene, run_dir)
+    raise ValueError(f"unknown rig {name!r} (dry | pool | isaac | mavros)")

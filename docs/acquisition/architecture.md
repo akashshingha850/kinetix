@@ -27,6 +27,12 @@ def run_session(cfg, rig, recon, planner, log):
 - **Baselines are configs.** `orbit` / `grid` use `sequence.py` (the planner returns the next pose
   of a fixed list, no scorer); `random` uses the random scorer; `oracle` uses `coverage_oracle`
   (sim only, reads GT, flagged `uses_gt: true` and reported as an upper bound).
+- **`surface_normal`** (objects; `planner/surface.py`, the benchmark's `explore_exploit`, after Liu et al. 2026, related_work [50]):
+  a coarse orbit (`planner.surface.coarse_*`, 8 views at 1.6 m) whose ZED depth (`rig.save_depth`, set by the CLI) becomes oriented
+  points binned into 10 cm patches; one level view per patch at `standoff_m` along its normal; KD-tree grouping (same heading
+  side only) down to the rest of the budget; nearest neighbour + 2-opt order with legs through the ROI shell barred; stop-and-go.
+  A leg that would cross the object goes round it via `rig.move_to` transits on the coarse ring. Uses ZED depth for planning,
+  so it is a stereo-plan baseline, not a mono method.
 
 ## 5a. Room capture: method `tour` (ADR-K11, ADR-K12)
 

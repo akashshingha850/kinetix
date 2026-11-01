@@ -1,0 +1,19 @@
+# K2 baseline matrix (roadmap K2 exit test, paper/benchmark.md §1): `uv run kinetix bench --matrix config/bench/baselines.yaml`.
+# T0 (pool rig): render the pools first, `kinetix pool make --scene <s>` per scene. Results in $KINETIX_DATA/bench/baselines/.
+name: baselines
+rig: pool
+scenes: [office_buddha, office_monster, office_chair]
+budgets: [5, 10, 20, 30, 40, 60, 80]
+seeds: [0, 1, 2]
+overrides: [planner.coverage_target=2.0, planner.min_gain=-1.0]   # budget curves: only the budget (or no view left) stops a session
+reference: {method: orbit_rings, fractions: [0.5, 0.75, 1.0]}     # dense reference = every pool view; 50/75 % for N@q sensitivity
+methods:
+  - orbit                        # one ring (24 views at most)
+  - orbit_rings                  # every ring, golden-angle order (the dense fixed pattern)
+  - random
+  - fvs
+  - volumetric_ig
+  - roi_coverage
+  - depth_coverage
+  - coverage_oracle
+  - {label: coverage_oracle_strict, method: coverage_oracle, overrides: [coverage.match_max_deg=15, coverage.min_overlap=0.5]}

@@ -17,6 +17,7 @@ coverage:                        # kinetix/coverage.py: the GT-free ROI-proxy co
   tri_min_deg: 8.0               # two rays at least this far apart = triangulable
   novel_deg: 25.0                # extra rays count only if this far from every existing one
   max_views: 6
+  k_min: 2                       # frames a point needs to count as covered (dense MVS wants 3; methodology.md §4.1)
 
 planner:
   max_consecutive_timeouts: 15   # moves that time out in a row (each blocks its view) before the run stops as `stalled`
@@ -38,6 +39,7 @@ rig:
   settle_s: 1.0                  # sim seconds inside the tolerances before the grab
   move_timeout_s: 60.0           # sim seconds per move
   image_timeout_s: 10.0
+  render_timeout_s: 60.0         # isaac rig (T1): seconds to wait for a rendered view (the first ones stream textures)
   silent_timeout_s: 30.0         # wall seconds without a mavros state/pose message while flying = the rig is dead: abort and land
   min_rtf: 0.1                   # wall-clock backstop = sim timeout / this (a stalled /clock still times out)
   speed_mps: 0.5                 # nominal, for the dry rig's time estimate
