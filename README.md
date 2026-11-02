@@ -23,6 +23,7 @@ Two authors share this repo ([docs/collaboration.md](docs/collaboration.md)): `a
 
 | Need to… | Read |
 |---|---|
+| **Start here**: reading paths by role, every doc in one line, how to debug a run | [docs/README.md](docs/README.md) |
 | **Shared** | |
 | know who owns what, the folder tree, branches, frozen runs | [docs/collaboration.md](docs/collaboration.md) |
 | see how the system is built (tiers, sensing modes, module map) | [docs/architecture.md](docs/architecture.md) |

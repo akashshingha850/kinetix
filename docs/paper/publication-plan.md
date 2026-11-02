@@ -23,6 +23,9 @@ and a real room.
 
 ## 2. Contributions (paper wording) and the evidence each needs
 
+**Proposed refinement (ADR-K14, 2026-11-02):** four research questions RQ1–RQ4 and contributions K-A–K-D, with N@q demoted to a metric:
+[research-questions.md](research-questions.md). The table below stays in force until both authors accept it.
+
 | # | Contribution | Evidence (benchmark matrix → table/figure) | Phase |
 |---|---|---|---|
 | C1 | A monocular next-best-view method for single-object photogrammetry that anchors a relative-depth foundation model to the scale of the incremental SfM reconstruction and fuses it into a TSDF frontier score, combined with an SfM-uncertainty score. It needs no depth sensor or metric-depth model for planning. | `bench/ablation`: anchoring (`mono` vs `mono_metric_noanchor` vs `mono_stereo_anchor` vs `none`), scorer terms alone vs combined → **Table 3** | K3 |

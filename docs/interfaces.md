@@ -198,7 +198,8 @@ ZED Mini intrinsics from `pool.yaml` / config.
 ```
 kinetix check                                    # = scripts/check_env.py
 kinetix pool make  --scene S [--out DIR] [--views-only] [key=value ...]   # ring-stack views.jsonl → T1 batch render (built)
-kinetix run   --scene S --method M --rig dry|pool|isaac|mavros [--pool DIR] --seed K [key=value ...]  → data/<id>/ (built)
+kinetix run   --scene S --method M --rig dry|pool|isaac|mavros [--pool DIR] --seed K [--strict] [key=value ...]  → data/<id>/ (built)
+kinetix check data/<id> [data/<id> ...]                                 → ok/FAIL per run, exit 1 on a problem (built, kinetix/checks.py)
 kinetix sfm   data/<id> [--pose-source sfm|prior] [--pairing ...]      → data/<id>/sfm/ (built)
 kinetix eval  data/<id> [--scene S]                                    → data/<id>/sfm/eval.json (built, sparse points)
 kinetix bench --matrix config/bench/<name>.yaml [--jobs N] [--out DIR]  → $KINETIX_DATA/bench/<name>/report.md (built)

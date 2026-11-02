@@ -3,16 +3,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import traceback
+import warnings
 from pathlib import Path
 
-from acquisition.planner.loop import METHODS, run_session
+from acquisition.planner.loop import run_session
+from acquisition.planner.methods import METHODS, uses_gt
 from acquisition.rig.base import load_rig
 from kinetix.config import DATA, ROOT, load_config, load_scene
 from kinetix.coverage import CoverageState, MeshOcclusion, gt_surface
 from kinetix.runlog import RunLog
 from kinetix.types import Intrinsics
-
-DEPTH_METHODS = ("surface_normal", "depth_coverage", "volumetric_ig")
 
 
 def cmd_run(a) -> int:
@@ -22,7 +23,8 @@ def cmd_run(a) -> int:
         if a.method != "tour" or scene.kind != "room":
             raise SystemExit("--explore: a room scene with --method tour (the room is explored, then toured)")
         a.overrides = list(a.overrides) + ["explore.enabled=true"]
-    if a.method in DEPTH_METHODS:                    # they plan on (or map) the depth of the views so far
+    spec = METHODS[a.method]
+    if spec.needs_depth:                             # they plan on (or map) the depth of the views so far
         a.overrides = list(a.overrides) + ["rig.save_depth=true"]
     if a.rig == "pool":
         a.overrides = list(a.overrides) + [f"rig.pool={a.pool or default_pool(a.scene)}"]
@@ -32,12 +34,23 @@ def cmd_run(a) -> int:
         from acquisition.planner.explore import hint_scene
         truth, scene = scene, hint_scene(scene, cfg["explore"]["volume_m"], cfg["explore"].get("altitude_m"))
     tag = ("explore-opt" if cfg["explore"]["reuse_views"] else "explore-trad") if a.explore else ""
-    oracle = a.method == "coverage_oracle"            # plans on the GT surface: an upper bound, flagged in run.yaml
-    # the pool and isaac rigs' depth is the renderer's GT depth: a depth method there reads GT too (data-format.md §3 uses_gt)
-    uses_gt = oracle or (a.method in DEPTH_METHODS and a.rig in ("pool", "isaac"))
-    log = RunLog(a.out, scene.name, a.method, a.rig, a.seed, cfg, uses_gt=uses_gt, repo_root=ROOT, tag=tag,
-                 scene_path=a.scene.resolve() if a.scene.exists() else None)
+    if a.strict:                                    # the first NaN, warning or check problem stops the run with its traceback
+        import numpy as np
+        np.seterr(invalid="raise")
+        warnings.simplefilter("error")
+    log = RunLog(a.out, scene.name, a.method, a.rig, a.seed, cfg, uses_gt=uses_gt(a.method, a.rig), repo_root=ROOT, tag=tag,
+                 scene_path=a.scene.resolve() if a.scene.exists() else None, strict=a.strict)
     a.run_dir = log.dir
+    try:
+        return _session(a, cfg, scene, truth, spec, log)
+    except Exception as e:                          # a crash still closes the run: traceback in log.txt, stop_reason error
+        log.info("ERROR " + traceback.format_exc())
+        log.close("error", {"error": f"{type(e).__name__}: {e}"})
+        raise
+
+
+def _session(a, cfg, scene, truth, spec, log) -> int:
+    oracle = spec.surface == "gt"                     # plans on the GT surface: an upper bound, flagged in run.yaml
     log.info(f"run {log.run_id}: scene {scene.name} ({scene.kind}), method {a.method}, rig {a.rig}, "
              f"budget {cfg['planner']['budget']}")
     cam = cfg["camera"]
@@ -55,6 +68,26 @@ def cmd_run(a) -> int:
     summary = log.close(result.pop("stop_reason") or "unknown", result)
     print(f"run dir: {log.dir}")
     return 0 if summary["frames"] > 0 and summary["stop_reason"] not in ("aborted", "stalled") else 1
+
+
+def cmd_check(a) -> int:
+    """The gate before the next step (docs/README.md "Debug a run"): exit 0 when every run is consistent."""
+    import yaml
+
+    from kinetix.checks import run_problems
+    bad = 0
+    for run in a.runs:
+        probs, notes = run_problems(run)
+        head = yaml.safe_load((run / "run.yaml").read_text()) if (run / "run.yaml").exists() else {"method": None}
+        if head["method"] in METHODS and head["uses_gt"] != uses_gt(head["method"], head["rig"]["name"]):
+            probs.append(f"uses_gt {head['uses_gt']} disagrees with the method table for {head['method']} on {head['rig']['name']}")
+        bad += bool(probs)
+        print(f"{'FAIL' if probs else 'ok'}  {run}")
+        for line in [f"  ! {p}" for p in probs[:a.max]] + [f"    {n}" for n in notes]:
+            print(line)
+        if len(probs) > a.max:
+            print(f"  ! ... {len(probs) - a.max} more")
+    return 1 if bad else 0
 
 
 def default_pool(scene: Path) -> Path:
@@ -143,7 +176,7 @@ def main(argv=None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run", help="one capture session")
     r.add_argument("--scene", required=True, help="scene dir or scene.yaml (e.g. kinetix/scenes/simple_room_blocks.yaml)")
-    r.add_argument("--method", default="roi_coverage", choices=METHODS)
+    r.add_argument("--method", default="roi_coverage", choices=list(METHODS))
     r.add_argument("--rig", default="dry", choices=["dry", "pool", "isaac", "mavros"])
     r.add_argument("--pool", default=None, help="pool rig: the pool folder (default $KINETIX_DATA/pools/<scene>/rings)")
     r.add_argument("--seed", type=int, default=0)
@@ -152,6 +185,8 @@ def main(argv=None) -> int:
                         "its take-off point and altitude band; it scores the fit)")
     r.add_argument("--config", action="append", help="extra config YAML over acquisition/config/ (e.g. acquisition/config/experiments/close.yaml; repeatable)")
     r.add_argument("--out", default=str(DATA))
+    r.add_argument("--strict", action="store_true", help="stop at the first NaN, Python warning or run-dir check problem (debugging; "
+                   "on mavros it ends the flight: the rig lands)")
     r.add_argument("overrides", nargs="*", help="key=value, e.g. planner.budget=12")
     f = sub.add_parser("sfm", help="offline SfM over a run's frames (pycolmap) + ATE and proxy completeness")
     f.add_argument("run", help="run directory")
@@ -173,6 +208,9 @@ def main(argv=None) -> int:
     e = sub.add_parser("eval", help="score a run's SfM model against the scene GT (runs kinetix sfm first if needed)")
     e.add_argument("run", type=Path)
     e.add_argument("--scene", default=None)
+    c = sub.add_parser("check", help="consistency of run directories (files, poses, stop reason, warnings); exit 1 on a problem")
+    c.add_argument("runs", nargs="+", type=Path)
+    c.add_argument("--max", type=int, default=10, help="problems listed per run")
     b = sub.add_parser("bench", help="a scenes x methods x seeds x budgets matrix -> results.csv + report.md")
     b.add_argument("--matrix", default=None, help="config/bench/<name>.yaml")
     b.add_argument("--jobs", type=int, default=4, help="cells in parallel (each: session, SfM, budget prefixes)")
@@ -189,5 +227,7 @@ def main(argv=None) -> int:
         return cmd_eval(a)
     if a.cmd == "bench":
         return cmd_bench(a)
+    if a.cmd == "check":
+        return cmd_check(a)
     a.scene = Path(a.scene)
     return cmd_run(a)

@@ -76,6 +76,24 @@ rule, not a score term, so it also applies to the baselines and does not favour 
 On T0/T1 the depth baselines read rendered GT depth, which makes them stronger than they would be on hardware. They are flagged
 `uses_gt` and are reported as "depth-oracle" baselines. Their honest versions are `stereo_plan` (ZED/FoundationStereo depth) and C1.
 
+### 2.1 Why each stage is built this way
+
+Each design choice rests on peer-reviewed evidence; the right-hand column is what that evidence does **not** settle and Kinetix has
+to measure itself (the V-level that measures it). References are numbered as in [related_work.md](paper/research/related_work.md).
+
+| Stage | Choice | Evidence | Still ours to show |
+|---|---|---|---|
+| M0 | discrete pool of 4-DoF candidates, Tammes layout planned | view-sphere candidate sets are the NBV standard [[14]](paper/research/related_work.md#ref14), [[47]](paper/research/related_work.md#ref47); ObjView-Bench's 128-view Tammes sphere [[46]](paper/research/related_work.md#ref46) (preprint) | discrete vs continuous changes nothing (V7) |
+| M2, M8 | incremental SfM (COLMAP/pycolmap) as the planner's model and the final pipeline | COLMAP [[1]](paper/research/related_work.md#ref1); next-view choice inside SfM to keep it well-conditioned [[1]](paper/research/related_work.md#ref1) | ReconState = offline SfM on the same frames (V5c) |
+| M3 | relative depth (DA-V2) anchored by a scale + shift fit in inverse depth to the SfM points | DA-V2 [[51]](paper/research/related_work.md#ref51); the scale-and-shift-invariant formulation of relative depth [[52]](paper/research/related_work.md#ref52); SfM points guiding monocular depth, offline [[40]](paper/research/related_work.md#ref40); naive single-image depth fails inside an NBV loop [[35]](paper/research/related_work.md#ref35), [[39]](paper/research/related_work.md#ref39) | anchoring beats metric depth and stereo anchoring *online*, at 5–20 views (V5a, RQ3) |
+| M4 | TSDF / occupancy over the ROI | volumetric fusion [[58]](paper/research/related_work.md#ref58); volumetric NBV maps [[16]](paper/research/related_work.md#ref16), [[17]](paper/research/related_work.md#ref17) | map from anchored depth ≈ map from GT depth (V5b) |
+| M5 | frontier (unknown-voxel) gain + SfM-uncertainty gain | frontiers [[23]](paper/research/related_work.md#ref23); volumetric information gain compared [[16]](paper/research/related_work.md#ref16), [[17]](paper/research/related_work.md#ref17); uncertainty-driven view choice [[1]](paper/research/related_work.md#ref1), [[48]](paper/research/related_work.md#ref48) | each term helps alone, and combined (V6 ablation) |
+| M5 | **registration constraint**: a candidate must be matchable to what is seen | detector/descriptor matching fails beyond ~25–30° viewpoint change [[53]](paper/research/related_work.md#ref53); matchability can be predicted [[54]](paper/research/related_work.md#ref54) | the predictor actually predicts SfM registration (V3 overlap half, RQ1) |
+| M6 | argmax of gain − travel cost | receding-horizon NBV utility with path cost [[15]](paper/research/related_work.md#ref15); drone NBV with travel [[10]](paper/research/related_work.md#ref10), [[42]](paper/research/related_work.md#ref42) | — (fixed design, weights frozen on Buddha, §7) |
+| M9 | dense MVS (COLMAP patch-match) | [[59]](paper/research/related_work.md#ref59); evaluation needs dense surfaces, sparse points cap recall (V1, measured) | F_ref ≥ 0.8 per scene (V1) |
+| eval | F-score at τ = 1 % of D, accuracy/completeness | Tanks and Temples precision/recall/F [[56]](paper/research/related_work.md#ref56); Sim3 alignment [[60]](paper/research/related_work.md#ref60) | metric code correct (V0) |
+| stats | paired Wilcoxon over (scene, seed), Holm correction, Kendall τ across tiers | Wilcoxon for paired comparisons over data sets [[57]](paper/research/related_work.md#ref57); Holm [[61]](paper/research/related_work.md#ref61); sim→real predictivity as a rank/correlation between tiers [[55]](paper/research/related_work.md#ref55) | — |
+
 ## 3. Information boundary
 
 What the planner may read, by sensing preset (ADR-K07; the topic whitelist is in [interfaces.md](interfaces.md) §4):

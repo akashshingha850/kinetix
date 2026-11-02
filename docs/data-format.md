@@ -138,8 +138,10 @@ sensing: {preset: mono, plan_depth: mono, recon_input: left, depth_model: da_v2_
 uses_gt: false            # true if the scorer OR the depth source reads GT
 seed: 0
 config: { ... the full resolved config ... }
-summary: {frames: 24, registered: 24, travel_m: 31.2, wall_s: 210.4, sim_s: null, stop_reason: gain_plateau,
+summary: {frames: 24, registered: 24, travel_m: 31.2, wall_s: 210.4, sim_s: null, stop_reason: gain_plateau, warnings: 0,
           map_shift: [0.122, 0.003, -0.208]}   # mavros rig: measured - scene world_to_map; scene GT (gt_mesh, roi) + map_shift = this run's map
+# warnings: WARN lines in log.txt (run-dir check problems + Python/numpy warnings). A crash closes the run with
+# stop_reason: error and error: "<Type>: <message>" (traceback in log.txt). No summary at all = the process was killed.
 ```
 
 ```json

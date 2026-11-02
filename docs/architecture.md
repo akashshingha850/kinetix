@@ -102,12 +102,27 @@ the next-best-view problem becomes a discrete selection. That is deterministic, 
 the NBV literature. T1 (batch mode) produces pools. T0 also works for real data: a dense real capture
 becomes a real pool.
 
+## 3a. One session, oracle to real flight
+
+A session is `kinetix run --method M --rig R`. The planner code is the same in every cell; what changes is **what the method reads**
+(its row in `acquisition/planner/methods.py`) and **where frames come from** (the rig). Debug a method from the top of this table
+down: a fault that shows on `dry` or `pool` is a planner fault, one that first shows on `mavros` is flight or sensing.
+
+| Method kind (methods.py) | dry (unit tests) | pool T0 | isaac T1 | mavros T2 sim | mavros T3 real |
+|---|---|---|---|---|---|
+| GT-free, box surface (`roi_coverage`, `fvs`, `random`, `orbit*`, `tour`) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| depth (`volumetric_ig`, `depth_coverage`, `surface_normal`) | ✓ (synthetic depth) | ✓ **GT depth** † | ✓ **GT depth** † | ✓ ZED depth | ✓ ZED depth |
+| oracle (`coverage_oracle`, surface `gt`) | needs GT files | ✓ † | ✓ † | ✓ † | ✗ no GT: stops at start (`gt_surface` raises) |
+
+† `run.yaml uses_gt: true` (`methods.uses_gt`), marked in every bench table. Frames carry `gt_pose` on every rig that knows it
+(dry, pool, isaac, and T2 through Pegasus `state/pose`). On T3 `gt_pose` is null, and ground truth for evaluation is open question Q4.
+
 ## 4. Module map
 
 Layout: three top-level packages, no `src/`. `kinetix/` is the small shared library, `acquisition/` (author A) and
 `reconstruction/` (author B) are the two areas ([collaboration.md](collaboration.md)); each keeps its tests in its own `tests/`.
-Target layout (created incrementally per [roadmap.md](roadmap.md); not built yet: `pool.py`, `isaac_render.py`, `state.py`,
-`depth/`, `seed.py`, `sequence.py`, most scorers, `external/`, `densify.py`, `metrics.py`, `evaluate.py`, `bench/`, `sim/`):
+Target layout (created incrementally per [roadmap.md](roadmap.md); not built yet, 2026-11-02: `mapping/state.py`, `mapping/depth/`,
+`seed.py`, `sequence.py`, the scorers `sfm_uncertainty`, `depth_frontier`, `combo`, `coverage_oracle` as its own file, and `external/`):
 
 ```
 kinetix/                         shared: both areas import it, it imports neither (cli.py excepted)
@@ -123,6 +138,8 @@ kinetix/                         shared: both areas import it, it imports neithe
 acquisition/                     author A: decides where to fly and what to capture
   planner/
     loop.py        the session entry point (§5): `run_session` picks the method's loop
+    methods.py     every method in one table: its loop, fixed or scored, the surface it plans on (box | gt | depth), whether it
+                   needs depth; `uses_gt(method, rig)` is the run.yaml flag (§3a)
     nbv.py         stepwise NBV loop (roi_coverage, random, orbit): select (argmax of gain − λ·travel cost),
                    stop rule (budget / coverage / gain plateau), orbit order
     explore.py     unknown room: occupancy map from ZED depth, frontier views, room fit (§5b)

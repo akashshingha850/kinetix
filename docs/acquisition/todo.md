@@ -3,6 +3,25 @@
 Current phase: **K1**, with a room-capture track run ahead of it (ADR-K11, ADR-K12). Phase definitions and exit tests:
 [roadmap.md](../roadmap.md). The evidence for each done item is in the ADR it names and in its run directory.
 
+## Structure and research framing (2026-11-02)
+- [x] One method table, `acquisition/planner/methods.py`: loop, fixed/scored, surface (box | gt | depth), needs depth, and
+  `uses_gt(method, rig)`. `kinetix/cli.py`, `planner/loop.py` and `planner/nbv.py` read it instead of testing method names
+  (`DEPTH_METHODS` and the rig-name check in cli.py are gone). Behaviour unchanged; `acquisition/tests/test_methods.py`.
+  The method × rig table (oracle to real flight) is architecture.md §3a.
+- [x] Docs: `docs/README.md` (index, reading paths, how to debug a run); methodology.md §2.1 (each stage's peer-reviewed
+  evidence, refs [51]–[61] added to related_work.md, [54] and [58]–[61] still to Crossref-check); paper/research-questions.md and
+  ADR-K14 (**proposed**: RQ1–RQ4, K-A–K-D, N@q as a metric); roadmap "Steps to submission" S1–S8 by RQ.
+- [ ] Both authors accept or reject ADR-K14; on acceptance replace publication-plan.md §2 and CLAUDE.md's C1–C5 line.
+- [ ] Novelty sweep for K-A (registration-aware view planning, research-questions.md §4) before S2's result is called a contribution.
+- [x] Debug aids (docs/README.md "Debug a run"): every frame/step checked as written (`WARN` in log.txt, `summary.warnings`),
+  Python/numpy warnings into log.txt, a crash closes the run with `stop_reason: error` + traceback, `kinetix run --strict` raises
+  at the first NaN/warning/problem, `kinetix check <runs>` gates each step (kinetix/checks.py, kinetix/tests/test_checks.py).
+  First `kinetix check data/2*` (2026-11-02): 5 isaac runs of `depth_coverage` / `surface_normal` (261031-220608, -231423,
+  -231433, -231556, -231615) say `uses_gt: false` but read renderer GT depth (written before methods.py): never count them as
+  GT-free. 261031-213914 died without a summary; 20261028-163032 has no run.yaml (old layout).
+- [ ] Both authors decide the two-paper split (research-questions.md §6: planning paper at IROS 2027, deadline 2027-03-01;
+  reconstruction paper later); on acceptance update publication-plan §5 (shared path, own PR).
+
 ## Now — room photogrammetry (Warehouse, `kinetix/scenes/warehouse_room.yaml`)
 How to run it: `METHOD=tour scripts/room_scan.sh all` (sim up, fly, `kinetix sfm`), or [architecture.md](architecture.md) §5a.
 - [ ] **Config split, room height, experiments (2026-10-30)**: `acquisition/config/default.yaml` is now `common.yaml` (camera, rig,

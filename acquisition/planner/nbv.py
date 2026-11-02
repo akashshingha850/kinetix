@@ -10,6 +10,7 @@ import numpy as np
 
 from acquisition.planner.constraints import BoxConstraints
 from acquisition.planner.loop import apply_shift
+from acquisition.planner.methods import METHODS
 from acquisition.planner.sampler import GridSampler, RingSampler
 from acquisition.planner.scorers import make_scorer
 from kinetix.geometry import camera_yaw, wrap
@@ -128,7 +129,8 @@ def run_nbv(cfg: dict, scene: Scene, rig, recon, method: str, log, seed: int = 0
         sampler = RingSampler(pc["rings"]["radii"], pc["rings"]["heights"], pc["rings"]["n_az"])
     cons = BoxConstraints(pc["clearance_m"], pc["roi_clearance_m"])
     stop = Stop(pc["budget"], pc["coverage_target"], pc["min_gain"], pc["patience"])
-    fixed = method in ("orbit", "orbit_rings")
+    spec = METHODS[method]
+    fixed = spec.fixed
     scorer = None if fixed else make_scorer(method, seed, scene, cfg)
     rng = np.random.default_rng(seed)
     frames = []
@@ -199,7 +201,7 @@ def run_nbv(cfg: dict, scene: Scene, rig, recon, method: str, log, seed: int = 0
             if hasattr(scorer, "add"):
                 scorer.add(frame)
             frames.append(frame)
-            if method == "depth_coverage" and len(frames) == pc["depth_surface"]["after_views"]:
+            if spec.surface == "depth" and len(frames) == pc["depth_surface"]["after_views"]:
                 recon = depth_surface(recon, frames, scene, cfg, log)
             taken.add(c.pool_id)
             last_gain = float(gains[i])

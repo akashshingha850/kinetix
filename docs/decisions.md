@@ -266,3 +266,15 @@ within 0.16 m, the tour flew; but 12 of 20 steps were legs (the targets pull pas
 an 18 x 25 x 2 m obstacle: the sim ZED's floor smeared 0.6 m deep and the obstacle band, `floor_margin_m` above the lowest floor slice,
 sat on the real floor (the tour then flew above 2.9 m: 120 viewpoints, coverage 0.71). The band now starts at most one slice below
 the fitted floor: the dry rooms keep their low crates, the floor boxes of all five Warehouse flight maps are gone on a refit.
+
+## ADR-K14 — Four research questions; registration loss becomes a question; N@q becomes a metric (2026-11-02, proposed)
+
+**Context.** ADR-K08 set five claims C1–C5. The first dense benchmark (methodology.md §4.1) showed that at ≤ 20 images the coverage
+oracle loses to simple baselines because 13–82 % of its views do not register in SfM. N@q's definition is still open (V1), and the
+tier protocol has a peer-reviewed precedent for navigation (Kadian et al., RA-L 2020). Five claims do not fit six RA-L pages.
+**Decision (proposed).** The paper asks RQ1–RQ4 and makes contributions K-A–K-D ([paper/research-questions.md](paper/research-questions.md)):
+K-A registration loss + a shared registration-aware admissibility rule (new, conditional on RQ1 and a novelty sweep), K-B = C2,
+K-C = C1 (still go/no-go at G2), K-D = C4 + C5. N@q stays the headline metric, not a contribution. The roadmap is ordered by RQ
+(roadmap.md "Steps to submission").
+**Consequences.** methodology.md §8 step 2b (registration model) becomes the first research step, not a fix. publication-plan.md §2
+keeps C1–C5 until both authors accept this ADR; on acceptance its §2 table is replaced by research-questions.md §3.

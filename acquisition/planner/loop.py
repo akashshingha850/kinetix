@@ -5,10 +5,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from acquisition.planner.methods import METHODS
 from kinetix.types import Scene, shifted
-
-METHODS = ("roi_coverage", "random", "orbit", "orbit_rings", "fvs", "volumetric_ig", "tour", "surface_normal", "depth_coverage",
-           "coverage_oracle")
 
 
 def apply_shift(rig, scene: Scene, recon, log) -> Scene:
@@ -22,12 +20,13 @@ def apply_shift(rig, scene: Scene, recon, log) -> Scene:
 
 
 def run_session(cfg: dict, scene: Scene, rig, recon, method: str, log, seed: int = 0, truth: Scene | None = None) -> dict:
-    if method == "tour":
+    loop = METHODS[method].loop
+    if loop == "tour":
         if scene.kind != "room":
             raise ValueError("tour is a room method (grid viewpoints + TSP + continuous capture)")
         from acquisition.planner.tour import run_tour
         return run_tour(cfg, scene, rig, recon, log, truth)
-    if method == "surface_normal":
+    if loop == "surface":
         from acquisition.planner.surface import run_surface
         return run_surface(cfg, scene, rig, recon, log)
     from acquisition.planner.nbv import run_nbv

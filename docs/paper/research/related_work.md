@@ -171,3 +171,29 @@ arXiv use their arXiv DOI (`10.48550/arXiv.*`). Where an arXiv version exists it
 <a id="ref49"></a>[49] A. Kostrzewa, A. Płatek-Żak, P. Banat, and Ł. Wilk, "Open-source vs. commercial photogrammetry: Comparing accuracy and efficiency of OpenDroneMap and Agisoft Metashape," *Int. Arch. Photogramm. Remote Sens. Spatial Inf. Sci.*, vol. XLVIII-1/W4-2025, pp. 65–72, 2025. DOI: [10.5194/isprs-archives-XLVIII-1-W4-2025-65-2025](https://doi.org/10.5194/isprs-archives-XLVIII-1-W4-2025-65-2025)
 
 <a id="ref50"></a>[50] H. Liu, Y. Zou, L. Yang, H. Chen, L. Xia, and L. Li, "Closer nap-of-the-object photogrammetry with geographic neural radiance fields," *Drones*, vol. 10, no. 7, Art. 524, 2026. DOI: [10.3390/drones10070524](https://doi.org/10.3390/drones10070524)
+
+### Method and evaluation references (added 2026-11-02 for the stage rationale, methodology.md §2.1)
+
+Venue and DOI of [51]–[53], [55]–[57] checked on the web 2026-11-02. **[54], [58]–[61] still need the Crossref check** (§8 of publication-plan.md) before they go into the paper.
+
+<a id="ref51"></a>[51] L. Yang, B. Kang, Z. Huang, Z. Zhao, X. Xu, J. Feng, and H. Zhao, "Depth Anything V2," in *Advances in Neural Information Processing Systems (NeurIPS)*, 2024. DOI: [10.52202/079017-0688](https://doi.org/10.52202/079017-0688) · arXiv: [2406.09414](https://arxiv.org/abs/2406.09414)
+
+<a id="ref52"></a>[52] R. Ranftl, K. Lasinger, D. Hafner, K. Schindler, and V. Koltun, "Towards robust monocular depth estimation: Mixing datasets for zero-shot cross-dataset transfer," *IEEE Trans. Pattern Anal. Mach. Intell.*, vol. 44, no. 3, pp. 1623–1637, 2022. DOI: [10.1109/TPAMI.2020.3019967](https://doi.org/10.1109/TPAMI.2020.3019967)
+
+<a id="ref53"></a>[53] P. Moreels and P. Perona, "Evaluation of features detectors and descriptors based on 3D objects," *Int. J. Comput. Vis.*, vol. 73, no. 3, pp. 263–284, 2007. DOI: [10.1007/s11263-006-9967-1](https://doi.org/10.1007/s11263-006-9967-1)
+
+<a id="ref54"></a>[54] W. Hartmann, M. Havlena, and K. Schindler, "Predicting matchability," in *Proc. IEEE Conf. Comput. Vis. Pattern Recognit. (CVPR)*, 2014. [Online]. Available: [CVF open access](https://openaccess.thecvf.com/content_cvpr_2014/papers/Hartmann_Predicting_Matchability_2014_CVPR_paper.pdf) *(DOI to check)*
+
+<a id="ref55"></a>[55] A. Kadian, J. Truong, A. Gokaslan, A. Clegg, E. Wijmans, S. Lee, M. Savva, S. Chernova, and D. Batra, "Sim2Real predictivity: Does evaluation in simulation predict real-world performance?," *IEEE Robot. Autom. Lett.*, vol. 5, no. 4, 2020. DOI: [10.1109/LRA.2020.3013848](https://doi.org/10.1109/LRA.2020.3013848) · arXiv: [1912.06321](https://arxiv.org/abs/1912.06321)
+
+<a id="ref56"></a>[56] A. Knapitsch, J. Park, Q.-Y. Zhou, and V. Koltun, "Tanks and Temples: Benchmarking large-scale scene reconstruction," *ACM Trans. Graph.*, vol. 36, no. 4, 2017. DOI: [10.1145/3072959.3073599](https://doi.org/10.1145/3072959.3073599)
+
+<a id="ref57"></a>[57] J. Demšar, "Statistical comparisons of classifiers over multiple data sets," *J. Mach. Learn. Res.*, vol. 7, pp. 1–30, 2006. *No DOI (JMLR).* [Online]. Available: [jmlr.org/papers/v7/demsar06a.html](https://www.jmlr.org/papers/v7/demsar06a.html)
+
+<a id="ref58"></a>[58] B. Curless and M. Levoy, "A volumetric method for building complex models from range images," in *Proc. SIGGRAPH*, 1996, pp. 303–312. DOI: [10.1145/237170.237269](https://doi.org/10.1145/237170.237269) *(to check)*
+
+<a id="ref59"></a>[59] J. L. Schönberger, E. Zheng, J.-M. Frahm, and M. Pollefeys, "Pixelwise view selection for unstructured multi-view stereo," in *Computer Vision – ECCV 2016*, LNCS, Springer, 2016. DOI: [10.1007/978-3-319-46487-9_31](https://doi.org/10.1007/978-3-319-46487-9_31) *(to check)*
+
+<a id="ref60"></a>[60] S. Umeyama, "Least-squares estimation of transformation parameters between two point patterns," *IEEE Trans. Pattern Anal. Mach. Intell.*, vol. 13, no. 4, pp. 376–380, 1991. DOI: [10.1109/34.88573](https://doi.org/10.1109/34.88573) *(to check)*
+
+<a id="ref61"></a>[61] S. Holm, "A simple sequentially rejective multiple test procedure," *Scand. J. Statist.*, vol. 6, no. 2, pp. 65–70, 1979. *No DOI (JSTOR).* *(to check)*
