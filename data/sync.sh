@@ -19,15 +19,17 @@
 #   data/sync.sh prune [-y] [RUN...]    delete release copies of runs not in git (default: all of them)
 #
 # RUN is a run id or a path to it. Env: KX_DATA_REPO (default: this repo, akashshingha850/kinetix, private), KX_DATA_TAG (default:
-# data), TMPDIR (zips are staged there: a run needs its size free, ~7 GB for a tour). Zips over PART_MB go up as <RUN>.zip.000, .001, ...
-# (older runs: .00, .01). Small parts because GitHub drops an upload idle for 60 s (HTTP 408) and the lab uplink black-holes one
-# TCP flow for ~70 s every minute or two (2026-11-01, ss -ti: RTO backoff to 34 s): a stall costs one part, which is retried.
+# data), KX_PART_MB (part size, default 1000), TMPDIR (zips are staged there: a run needs its size free, ~7 GB for a tour). Zips over PART_MB go up as <RUN>.zip.000, .001, ...
+# (older runs: .00, .01). Parts, because a stall costs one part, which is retried: on the old lab uplink GitHub dropped an upload idle
+# for 60 s (HTTP 408) as it black-holed one TCP flow for ~70 s every minute or two (2026-11-01, ss -ti: RTO backoff to 34 s), so the
+# parts were 50 MB; the new uplink (2026-11-02) does 1 GB in 53 s at ~150 Mbit/s without a stall, hence 1000. Set KX_PART_MB=50 if it
+# stalls again.
 # Parts go up as <name>.part and are renamed once all are up, so an interrupted push never looks like a complete run.
 set -euo pipefail
 
 KX="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TAG="${KX_DATA_TAG:-data}"
-PART_MB=50
+PART_MB="${KX_PART_MB:-1000}"   # GitHub allows 2 GiB per asset; lower it (e.g. 50) on a flaky uplink, a stall then costs less
 TRIES=10
 DROPPED=data/.dropped
 
@@ -156,6 +158,6 @@ case "$cmd" in
     else gone=$(comm -13 <(git_runs) <(release_runs)); fi
     [[ -n $gone ]] || { say "nothing to prune"; exit 0; }
     for r in $gone; do confirm "$r is on the release but not in git: delete its release copy?" && { delete_assets "$r"; say "$r: release copy deleted"; }; done;;
-  -h|--help|help) sed -n 2,22p "$0";;
+  -h|--help|help) sed -n 2,27p "$0";;
   *) die "unknown command $cmd (see --help)";;
 esac
