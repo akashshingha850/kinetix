@@ -1,0 +1,25 @@
+[     0.0s] run 261031-212055_office_buddha_roi_coverage: scene office_buddha (object), method roi_coverage, rig mavros, budget 20
+[     0.0s] coverage model: 2928 surface points, 0 occluders
+[    20.0s] step 0: -> r1.60_z1.35_a180 gain 0.089 (112/192 feasible)
+[    32.6s] frame 0: 520 surface pts in view, coverage 0.000 (seen 0.178), pose err 0.003 m
+[    32.6s] step 1: -> r1.60_z1.00_a225 gain 0.282 (95/192 feasible)
+[    46.2s] frame 1: 1140 surface pts in view, coverage 0.178 (seen 0.389), pose err 0.033 m
+[    46.2s] step 2: -> r1.60_z1.00_a300 gain 0.261 (110/192 feasible)
+[    61.3s] frame 2: 1125 surface pts in view, coverage 0.311 (seen 0.640), pose err 0.027 m
+[    61.4s] step 3: -> r1.60_z1.00_a045 gain 0.309 (110/192 feasible)
+[    76.6s] frame 3: 1150 surface pts in view, coverage 0.543 (seen 0.801), pose err 0.049 m
+[    76.6s] step 4: -> r1.60_z1.00_a120 gain 0.218 (110/192 feasible)
+[    92.1s] frame 4: 1122 surface pts in view, coverage 0.730 (seen 0.819), pose err 0.046 m
+[    92.1s] step 5: -> r1.60_z2.00_a120 gain 0.051 (108/192 feasible)
+[   101.8s] frame 5: 540 surface pts in view, coverage 0.730 (seen 0.901), pose err 0.020 m
+[   101.8s] step 6: -> r1.60_z2.00_a135 gain 0.082 (127/192 feasible)
+[   110.1s] frame 6: 548 surface pts in view, coverage 0.811 (seen 0.901), pose err 0.025 m
+[   110.2s] step 7: -> r1.60_z1.00_a150 gain 0.051 (126/192 feasible)
+[   120.2s] frame 7: 1022 surface pts in view, coverage 0.824 (seen 0.901), pose err 0.039 m
+[   120.3s] step 8: -> r1.60_z1.00_a135 gain 0.010 (105/192 feasible)
+[   128.5s] frame 8: 1127 surface pts in view, coverage 0.831 (seen 0.903), pose err 0.031 m
+[   128.5s] step 9: -> r1.60_z1.70_a135 gain 0.004 (104/192 feasible)
+[   137.2s] frame 9: 538 surface pts in view, coverage 0.831 (seen 0.903), pose err 0.024 m
+[   137.2s] step 10: -> r1.60_z1.70_a150 gain 0.000 (104/192 feasible)
+[   145.6s] frame 10: 443 surface pts in view, coverage 0.831 (seen 0.903), pose err 0.034 m
+[   178.4s] run closed: {'frames': 11, 'registered': None, 'travel_m': 14.85, 'wall_s': 178.4, 'sim_s': None, 'stop_reason': 'gain_plateau', 'coverage': 0.8313, 'seen': 0.9033, 'map_shift': [-0.0007, -0.0056, 0.007]}

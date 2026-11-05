@@ -1,7 +1,7 @@
 # Reconstruction pipeline
 
 What is made from a flight and how it is scored. Code in `reconstruction/`, todo in [todo.md](todo.md). Input: a run directory
-`data/<run>/` ([data-format.md](../data-format.md) §3, read only). Output: `results/<run>/<method>/` with a `metrics.json`
+`data/<run>/` ([data-format.md](../data-format.md) §3, read only). Output: `data/<run>/<method>/` with a `metrics.json`
 (metrics: [paper/benchmark.md](../paper/benchmark.md) §3). Ownership and the frozen benchmark runs: [collaboration.md](../collaboration.md).
 
 ## Offline pipeline (identical for every method)

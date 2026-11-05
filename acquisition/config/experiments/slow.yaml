@@ -1,0 +1,6 @@
+# Slower tour: 0.5 m/s and 30 deg/s turns (room default 1.0 m/s, 50 deg/s). Hypothesis: less motion blur and EKF2/VIO drift ->
+# lower ATE and sharper features, at ~2x the flight time.
+experiment: slow
+rig:
+  cruise_mps: 0.5
+  yaw_rate_deg_s: 30.0

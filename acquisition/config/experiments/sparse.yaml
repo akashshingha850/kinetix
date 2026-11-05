@@ -1,0 +1,6 @@
+# Fewer images: a keyframe every 0.6 m or 9 deg. Hypothesis: same completeness at ~0.65x the images (the efficiency end).
+experiment: sparse
+planner:
+  tour:
+    keyframe_step_m: 0.6
+    keyframe_step_deg: 9.0

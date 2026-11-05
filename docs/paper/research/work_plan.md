@@ -1,5 +1,8 @@
 # Kinetix Work Plan
 
+> **Superseded (2026-11-02).** Kept as the original pitch. The current questions and claims are in
+> [../research-questions.md](../research-questions.md), the plan in [../../roadmap.md](../../roadmap.md).
+
 ## Phase 1: Foundation (Weeks 1-4)
 - Literature review (expand Related Work)
 - Set up simulation environment: **NVIDIA Isaac Sim + Pegasus Simulator + MAVROS**

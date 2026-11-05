@@ -15,4 +15,5 @@ altitude_m: [0.9, 2.3]           # camera height in map (floor = map -0.11)
 standby: [0.0, 0.0, 1.35]        # camera position after takeoff: straight above the spawn point
 gt_mesh: null
 sim:
+  world: Simple Room            # the bisg world preset this scene is (bisg /sim/scenario "world"; the MRGCS bridge matches it)
   world_to_map: [2.5, 0.0, 0.67] # Pegasus state/pose (world) -> map, for the logged gt_pose

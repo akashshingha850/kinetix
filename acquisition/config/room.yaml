@@ -1,13 +1,10 @@
-# Room-scene layer (ADR-K11): applied after default.yaml for `kind: room` scenes, before --config files and key=value.
+# Room scenes (`kind: room`, ADR-K11): the whole room's walls, floor and ceiling, grid candidates, `tour` + `explore`. Over
+# common.yaml, under --config files (experiments/*.yaml) and key=value.
 # Tuned on the Warehouse (19.3 x 29.8 x 9 m inside, kinetix/scenes/warehouse_room.yaml): dry rig 69 images / 389 m to 90 %.
 
 coverage:
   spacing_m: 0.5                 # surface sample spacing on the room/obstacle faces (~8.5 k points in the Warehouse)
   depth_range_m: [0.3, 12.0]     # 12 m at fx 530 = 2.3 cm per pixel: still matchable texture
-  max_incidence_deg: 75.0
-  tri_min_deg: 8.0
-  novel_deg: 25.0
-  max_views: 6
   match_max_deg: 20.0            # rays further apart than this are not counted as matchable (no triangulation, no overlap).
                                  # Measured on the 2026-10-17 Warehouse flight (1128 pairs, SIFT + rig-checked verification):
                                  # P(match) 0.36-0.48 below 30 deg, 0.15 at 30-45, 0.04 at 60-90, 0 beyond 90
@@ -26,7 +23,11 @@ planner:
   clearance_m: 0.8               # drone radius + margin around no-fly boxes
   grid:                          # GridSampler: candidates filling the workspace
     spacing_m: 2.0
-    heights: [1.2, 2.8, 4.4]     # map z of the camera
+    heights: auto                # camera layers fill the altitude band (fitted from the room with --explore, else the scene's
+                                 # altitude_m) every <= layer_m, both band edges included; or a list of map z (until 2026-10-30:
+                                 # [1.2, 2.8, 4.4])
+    layer_m: 1.0                 # dry Warehouse tour, band 1.22..8.12 (2026-10-30, one run each): 1.0 m -> coverage 0.987, 98 m,
+                                 # planned in 28 s; 1.3 / 1.6 / 2.0 / 2.4 m -> 0.963 / 0.914 / 0.963 / 0.949 (fixed 3 layers: 0.964)
     n_yaw: 12                    # every 30 deg
 
   tour:                          # method `tour` (ADR-K12): viewpoints + TSP + continuous capture
@@ -39,6 +40,85 @@ planner:
     range_factor: null           # set (e.g. 1.5): a surface point counts as covered only from within factor x its closest reachable
                                  # viewing distance (planner/tour.py reach_range), clipped to [near_m, coverage.depth_range_m]; null = the flat range
     near_m: 5.0
+
+explore:                         # exploration pass for an unknown room (acquisition/planner/explore.py, `kinetix run --explore`, ADR-K13)
+  altitude_m: [1.1, 4.9]         # camera height band while exploring (map z; map origin = the take-off point on the floor): the room
+                                 # is unknown yet, so not the scene file's band. The tour then flies the fitted room's band (fit:)
+  enabled: false                 # --explore sets it. Needs a depth source: the mavros rig reads the ZED depth_registered
+  reuse_views: true              # the exploration views are keyframes (frames.jsonl, SfM) and count as coverage, so the tour flies the gaps;
+                                 # false = the traditional baseline: exploration only maps, the tour scans the whole room from scratch
+  volume_m: [40.0, 40.0, 12.0]   # search volume around the take-off point (map): where the occupancy map exists
+  below_m: 3.0                   # the volume starts this far below the take-off camera height (floor + margin)
+  voxel_m: 0.2                   # map resolution: a wall is one voxel thick, so walls are placed to +-0.1 m
+  depth_range_m: [0.3, 8.0]      # depth trusted for mapping (the ZED returns up to ~20 m, but noise grows with range)
+  look_range_m: 6.0              # a frontier voxel counts as looked at only within this range and with a clear line of sight
+                                 # (farther out it stays frontier, so a later view gets closer to it)
+  ray_stride_px: 8               # every 8th pixel of the depth image is a ray (720p: 14 k rays per view)
+  sweep_yaws: 8                  # views of the first in-place turn at take-off
+  max_time_s: 240.0              # sim seconds of exploring at most (EKF2 drifts with flight time)
+  tour_min_wall: 0.10            # the tour flies only if every wall and the floor were seen at least this much (else: land, no tour)
+  max_steps: 20                  # frontier views after the sweep. Keep exploration short: EKF2 drifts (sim: ~0.2 m in 5 min, >1 m by 10 min)
+  rig:                           # rig settings while exploring (a fresh depth image, not a hover)
+    tol_pos_m: 0.35
+    tol_yaw_deg: 10.0
+    tol_speed_mps: 0.3
+    settle_s: 1.0                # slow (2026-10-27, Warehouse, one flight each): 1 m/s + 60 deg/s turns + 0.2 s gave 5 false obstacles
+    cruise_mps: 1.0              # and no tour (pose 0.59 m off after a turn); 0.5 m/s + 20 deg/s + 1 s gave 0 and a tour. Yaw spikes of
+    yaw_rate_deg_s: 30.0         # 4-7 deg after a turn stayed either way (bisg side). Slower = longer: 28 views took 238 of max_time_s 240.
+                                 # 2026-10-28: 1 m/s + 30 deg/s (was 0.5 m/s, 20 deg/s) on bisg's magnetometer yaw + range height (docs/acquisition/todo.md)
+  min_views: 6                   # never stop as closed before this many views
+  stable_steps: 4                # ... or stop when the fitted room and obstacle count stayed put for this many steps
+  stable_tol_m: 0.3              # (a wall moves less than this between fits)
+  min_face: 0.25                 # ... and every face has been seen at least this much (an unseen wall is not 'stable')
+  min_frontier: 30               # fewer frontier voxels than this = nothing left to explore
+  range_frontier_weight: 1.0     # the edge of air carved by returns from beyond depth_range_m is frontier too, at this weight:
+                                 # without it nothing leads to a wall farther than the range (Warehouse: far walls 2-9 % seen)
+  min_frontier_gain: 20          # a view must see at least this many frontier voxels
+  face_weight: 25.0              # + this per m^2 of what the fitted room still lacks in view (explore.face_targets: the unseen part of
+                                 # each face below fit.closed_target, the unseen sides of obstacles and small blobs). 0 = frontier only.
+                                 # nbv_bench, 2026-10-28: Warehouse 8 starts, weakest wall/floor median 0.20 -> 0.56, tour gate 6/8 -> 7/8,
+                                 # 100 -> 78 m; the small rooms find the same obstacles. 50 overshoots (partition room 28 views / 61 m)
+  clearance_m: 0.8               # the drone parks only where this far from occupied and unknown space (horizontal) ...
+  clearance_z_m: 0.4             # ... and this far vertically. Both are raised to planner.clearance_m: the tour starts where exploration ends
+  cand_step_m: 1.0               # candidate viewpoints on a 1 m grid of safe voxels
+  max_candidates: 400
+  max_frontier_pts: 1500         # frontier points used to score a view (random subset above this)
+  n_yaw: 12                      # headings tried per candidate position
+  los_top: 8                     # the best views by cone score are re-scored with a line-of-sight test, a batch at a time ...
+  los_max: 64                    # ... down to this rank (a frontier behind a partition fails the whole first batch)
+  reach_cell: 1                  # corridor search grid for the flight distance / legs, in voxels (2: faster, but finds no leg in clutter)
+  travel_weight: 4.0             # frontier voxels a metre of flight must be worth
+  yaw_weight: 2.0                # ... and a radian of turn
+  register:                      # acquisition/mapping/register.py: depth-to-map registration estimates the EKF2 drift, so walls are not seen twice
+    enabled: true
+    search_m: 0.6                # offsets tried around the current estimate (coarse grid, then a fine one)
+    coarse_step_m: 0.2
+    fine_step_m: 0.05
+    points: 3000                 # depth points per frame used for the score
+    reg: 0.5                     # pull towards the current estimate (score per m^2): unobservable directions stay put
+    min_gain: 0.04               # a correction must raise the mean field value by this much
+    curv_step_m: 0.2             # observability probe: the score must fall at least `min_curv` when slid this far along an axis
+    min_curv: 0.04               # ... else that axis is unobservable from this view and is left alone
+    min_overlap: 0.15            # the frame must already land on the map this much (else it only extends the map)
+    min_occupied: 800            # occupied voxels needed before registering at all
+    max_step_m: 0.5              # largest correction per frame
+  fit:                           # acquisition/mapping/roomfit.py
+    slab_frac: 0.15              # a wall slice needs this share of the densest slices' voxel count ...
+    slab_min_voxels: 40          # ... and at least this many voxels
+    closed_target: 0.6           # every face of the room seen to this fraction = the room is closed
+    max_opening_voxels: 40       # ... and no face has more free voxels than this seen just beyond it (a gap past a partition,
+                                 # a doorway: that face is not the room's wall). 40 voxels of 0.2 m ~ 0.1 m3
+    wall_margin_m: 0.5           # occupied voxels this close to a wall are the wall, not an obstacle
+    floor_margin_m: 0.4
+    ceiling_margin_m: 0.6
+    floor_extend_m: 1.0          # an obstacle starting within this of the floor is extended down to it
+    min_obstacle_voxels: 25      # smaller blobs are noise
+    wall_artifact_m: 2.0         # a thin sheet this close to a wall is that wall seen again after pose drift, not an obstacle
+    workspace_margin_m: 1.5      # the drone stays this far from the walls
+    obstacle_reach_m: 1.0        # an obstacle counts only if it comes this close to the workspace (>= planner.clearance_m, rooms 0.8)
+    altitude_above_floor_m: [1.1, null]   # camera height band over the fitted floor; null top = up to the fitted ceiling
+                                 # (minus ceiling_margin_m + 0.4 m), so the band follows the room's height. The same rule gives the
+                                 # band of a scene file with `altitude_m: auto` (kinetix/config.py altitude_band)
 
 rig:
   save_depth: true               # pose + depth per frame for depth-aided photogrammetry (depth/<idx>.npy next to frames/<idx>.png)

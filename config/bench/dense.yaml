@@ -1,0 +1,14 @@
+# V1 (methodology.md §4): the baseline matrix's sessions scored on dense points instead of sparse ones. `runs_from` reuses the
+# sessions and sparse SfM of bench `baselines` (paired: same images), so run that one first. COLMAP patch-match in the CUDA image
+# (reconstruction/densify.py); the speed preset below is checked against COLMAP's defaults in docs/reconstruction/todo.md.
+# `uv run python -m kinetix bench --matrix config/bench/dense.yaml --jobs 2`
+name: dense
+rig: pool
+runs_from: baselines
+densify: {backend: colmap_mvs, max_image_size: 640, num_src: 8, geom: false}
+scenes: [office_buddha]
+budgets: [10, 20, 40, 80]
+seeds: [0, 1, 2]
+overrides: [planner.coverage_target=2.0, planner.min_gain=-1.0]
+reference: {method: orbit_rings, fractions: [0.5, 0.75, 1.0]}
+methods: [orbit, orbit_rings, random, fvs, volumetric_ig, roi_coverage, depth_coverage]

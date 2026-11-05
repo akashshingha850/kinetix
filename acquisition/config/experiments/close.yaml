@@ -1,0 +1,7 @@
+# Closer views: a surface point counts as covered only from within 1.5 x its closest reachable viewing distance (planner/tour.py
+# reach_range), so the tour flies nearer the walls. Hypothesis: more texture per pixel -> denser points, longer flight.
+# Flown 2026-10-29 in the Warehouse (docs/acquisition/todo.md, "Viewing distance vs flight cost").
+experiment: close
+planner:
+  tour:
+    range_factor: 1.5

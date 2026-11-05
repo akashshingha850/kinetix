@@ -1,0 +1,5 @@
+[     0.0s] run 261030-152836_warehouse_room_roi_coverage: scene warehouse_room (room), method roi_coverage, rig mavros, budget 120
+[     0.0s] coverage model: 8718 surface points, 0 occluders
+[    22.5s] scene shifted by [0.126, -0.006, -0.222] m (measured map origin vs the scene's world_to_map)
+[    28.8s] step 0: -> x+0.0_y-0.1_z4.1_h000 gain 0.107 (12096/12096 feasible)
+[   212.8s] run closed: {'frames': 0, 'registered': None, 'travel_m': 0.0, 'wall_s': 212.8, 'sim_s': None, 'stop_reason': 'aborted', 'coverage': 0.0, 'seen': 0.0}

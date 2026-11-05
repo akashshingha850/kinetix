@@ -1,0 +1,65 @@
+# Kinetix settings shared by every scene (architecture.md §10). Layered: common.yaml < object.yaml | room.yaml (by the
+# scene's `kind`) < --config files (e.g. experiments/*.yaml) < key=value overrides.
+
+camera:                          # nominal ZED Mini left rect 720p (101 x 68 deg; 1080p is a crop of the 2K sensor, 84 x 54 deg, f 1059.6:
+  width: 1280                    # tried 2026-10-30, the dry Warehouse explore/tour lost coverage); the mavros rig replaces K with camera_info
+  height: 720
+  fx: 529.8
+  fy: 529.8
+  cx: 640.0
+  cy: 360.0
+  mount_pitch_deg: 0.0           # bisg: forward-looking, level (Q1 open)
+  t_base_cam: [0.1205, 0.0304, 0.0527]   # base_link -> left optical origin (raptor CAD mount + half baseline). Fallback only:
+                                          # the mavros rig reads it from TF (base_link -> zed_left_camera_frame_optical)
+
+coverage:                        # kinetix/coverage.py: the GT-free ROI-proxy coverage model
+  max_incidence_deg: 75.0        # a point counts as seen only below this angle to its normal
+  tri_min_deg: 8.0               # two rays at least this far apart = triangulable
+  novel_deg: 25.0                # extra rays count only if this far from every existing one
+  max_views: 6
+  k_min: 2                       # frames a point needs to count as covered (dense MVS wants 3; methodology.md §4.1)
+
+planner:
+  max_consecutive_timeouts: 15   # moves that time out in a row (each blocks its view) before the run stops as `stalled`
+  roi_clearance_m: 0.45          # keep-out shell around the ROI (segments included)
+
+rig:
+  depth_topic: zed/zed_node/depth/depth_registered   # explore: float32 metres, registered to the left image
+  save_depth: false              # mavros rig: also save the ZED depth of every frame to <run>/depth/<idx>.npy (float32 m, NaN = no return;
+                                 # recorded, never a planner input: for depth-aided photogrammetry). Room scenes turn it on (room.yaml)
+  dry_depth_noise_frac: 0.01     # dry rig: depth noise as a fraction of range (explore tests)
+  dry_depth_max_m: 15.0          # dry rig: farthest return (the sim's ZED stops at 15 m)
+  dry_drift_m_per_sqrt_m: 0.0    # dry rig: EKF2 drift, a random walk of this std per sqrt(metre flown); real sim: ~0.1 (1.4 m over 200 m)
+  ns: /drone_1
+  camera_frame: zed_left_camera_frame_optical
+  setpoint_hz: 20                # wall clock; PX4 drops OFFBOARD below 2 Hz
+  tol_pos_m: 0.10
+  tol_yaw_deg: 3.0
+  tol_speed_mps: 0.05
+  settle_s: 1.0                  # sim seconds inside the tolerances before the grab
+  move_timeout_s: 60.0           # sim seconds per move
+  image_timeout_s: 10.0
+  render_timeout_s: 60.0         # isaac rig (T1): seconds to wait for a rendered view (the first ones stream textures)
+  silent_timeout_s: 30.0         # wall seconds without a mavros state/pose message while flying = the rig is dead: abort and land
+  min_rtf: 0.1                   # wall-clock backstop = sim timeout / this (a stalled /clock still times out)
+  speed_mps: 0.5                 # nominal, for the dry rig's time estimate
+  dry_noise_m: 0.0
+  cruise_mps: 0.8                # the streamed setpoint moves to the target at most this fast (carrot; VIO-safe, bisg vio_bench legs 0.5-1 m/s)
+  yaw_rate_deg_s: 50.0           # every turn is paced at this rate, moves and fly_path (a yaw step = PX4 MC_YAWRATE_MAX 60 deg/s)
+  max_lead_m: 1.5                # fly_path: the path clock pauses while the drone is further than this behind the setpoint
+  stall_s: 20.0                  # ... and the flight is aborted when it stays more than 3x that behind for this long (sim seconds)
+  max_speed_mps: 4.0             # EKF2 speed above this is not this drone (sim: its estimate diverged): abort and land
+  auto_world_to_map: true        # sim: measure map - world on the ground at start (EKF2 body - Pegasus body) for gt_pose; scene value if no GT
+  bag:                           # MCAP recording of the flight into <run>/rosbag/ (interfaces.md §4). Never in git (data/sync.sh)
+    enabled: true
+    storage: mcap
+    topics:                      # relative to rig.ns unless absolute
+      - zed/zed_node/left/color/rect/image/compressed
+      - zed/zed_node/left/color/rect/camera_info
+      - mavros/local_position/pose
+      - mavros/state
+      - mavros/setpoint_position/local
+      - state/pose
+      - /tf
+      - /tf_static
+      - /clock

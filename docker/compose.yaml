@@ -14,3 +14,4 @@ services:
       CYCLONEDDS_URI: file:///kinetix/docker/cyclonedds.xml
     volumes:
       - ..:/kinetix:rw
+      - ${KINETIX_DATA:-/tmp/kinetix-data}:${KINETIX_DATA:-/tmp/kinetix-data}:rw   # scenes etc. at the host path (data-format.md)

@@ -1,0 +1,40 @@
+[     0.0s] run 261031-013603_office_buddha_roi_coverage: scene office_buddha (object), method roi_coverage, rig mavros, budget 20
+[     0.0s] coverage model: 2928 surface points, 0 occluders
+[    25.4s] scene shifted by [-0.066, 0.014, -0.018] m (measured map origin vs the scene's world_to_map)
+[    25.5s] step 0: -> r1.60_z1.35_a180 gain 0.089 (112/192 feasible)
+[    36.1s] frame 0: 500 surface pts in view, coverage 0.000 (seen 0.171), pose err 0.030 m
+[    36.1s] step 1: -> r1.60_z1.00_a135 gain 0.276 (95/192 feasible)
+[   157.4s] step 1: timeout: not settled at [1.2, 1.21, 0.95] after 60 s sim
+[   157.4s] step 1: -> r1.60_z1.00_a120 gain 0.276 (110/192 feasible)
+[   277.2s] step 1: timeout: not settled at [1.55, 1.49, 0.95] after 60 s sim
+[   277.2s] step 1: -> r1.60_z1.00_a150 gain 0.265 (109/192 feasible)
+[   398.0s] step 1: timeout: not settled at [0.93, 0.85, 0.95] after 60 s sim
+[   398.0s] step 1: -> r1.60_z1.00_a225 gain 0.276 (112/192 feasible)
+[   518.5s] step 1: timeout: not settled at [1.24, -1.22, 0.95] after 60 s sim
+[   518.5s] step 1: -> r1.60_z1.00_a240 gain 0.276 (107/192 feasible)
+[   639.1s] step 1: timeout: not settled at [1.6, -1.49, 0.95] after 60 s sim
+[   639.1s] step 1: -> r1.60_z1.00_a210 gain 0.265 (106/192 feasible)
+[   759.6s] step 1: timeout: not settled at [0.96, -0.87, 0.95] after 60 s sim
+[   759.6s] step 1: -> r1.20_z1.00_a225 gain 0.241 (109/192 feasible)
+[   879.2s] step 1: timeout: not settled at [1.52, -0.94, 0.95] after 60 s sim
+[   879.3s] step 1: -> r1.20_z1.00_a240 gain 0.234 (100/192 feasible)
+[   992.7s] frame 1: 884 surface pts in view, coverage 0.165 (seen 0.308), pose err 0.021 m
+[   992.7s] step 2: -> r1.60_z1.00_a300 gain 0.247 (93/192 feasible)
+[  1008.3s] frame 2: 1097 surface pts in view, coverage 0.277 (seen 0.571), pose err 0.030 m
+[  1008.3s] step 3: -> r1.60_z1.00_a315 gain 0.265 (106/192 feasible)
+[  1017.0s] frame 3: 1121 surface pts in view, coverage 0.538 (seen 0.581), pose err 0.016 m
+[  1017.0s] step 4: -> r1.60_z1.00_a045 gain 0.101 (105/192 feasible)
+[  1137.7s] step 4: timeout: not settled at [3.63, 1.25, 0.95] after 60 s sim
+[  1137.7s] step 4: -> r1.60_z1.00_a060 gain 0.101 (106/192 feasible)
+[  1258.8s] step 4: timeout: not settled at [3.27, 1.52, 0.95] after 60 s sim
+[  1258.8s] step 4: -> r1.60_z1.00_a030 gain 0.090 (105/192 feasible)
+[  1381.0s] step 4: timeout: not settled at [3.91, 0.9, 0.95] after 60 s sim
+[  1381.1s] step 4: -> r1.20_z1.00_a045 gain 0.077 (105/192 feasible)
+[  1502.4s] step 4: timeout: not settled at [3.35, 0.97, 0.95] after 60 s sim
+[  1502.4s] step 4: -> r1.20_z1.00_a060 gain 0.073 (100/192 feasible)
+[  1623.5s] step 4: timeout: not settled at [3.07, 1.17, 0.95] after 60 s sim
+[  1623.5s] step 4: -> r1.20_z1.00_a120 gain 0.095 (95/192 feasible)
+[  1743.4s] step 4: timeout: not settled at [1.75, 1.14, 0.95] after 60 s sim
+[  1743.4s] step 4: -> r1.20_z1.00_a135 gain 0.101 (98/192 feasible)
+[  1799.7s] step 4: aborted: ROS context shut down
+[  1800.1s] run closed: {'frames': 4, 'registered': None, 'travel_m': 5.7, 'wall_s': 1800.1, 'sim_s': None, 'stop_reason': 'aborted', 'coverage': 0.5379, 'seen': 0.5806, 'map_shift': [-0.0656, 0.0145, -0.0183]}

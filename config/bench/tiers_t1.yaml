@@ -1,0 +1,20 @@
+# T1 half of the T0 <-> T1 tier comparison (roadmap K4 exit test "T1 within 0.05 F of T0", C4). One scene per render server.
+#   scripts/render_server.sh serve office_buddha                                    (stop the flight sim first)
+#   docker compose --env-file .env -f docker/compose.yaml run --rm kinetix python3 -m kinetix bench \
+#       --matrix config/bench/tiers_t1.yaml --jobs 1 --sessions-only                (ROS; --jobs 1: one render server, one client)
+#   uv run python -m kinetix bench --matrix config/bench/tiers_t1.yaml --jobs 6      (host: SfM + scoring of the same cells)
+#   uv run python -m kinetix bench --report $KINETIX_DATA/bench/baselines $KINETIX_DATA/bench/tiers_t1 --out $KINETIX_DATA/bench/tiers
+name: tiers_t1
+rig: isaac
+scenes: [office_buddha]
+budgets: [5, 10, 20, 30, 40, 60, 80]
+seeds: [0, 1, 2]
+overrides: [planner.coverage_target=2.0, planner.min_gain=-1.0]
+reference: {method: orbit_rings, fractions: [0.5, 0.75, 1.0]}
+methods:                         # the same labels as config/bench/baselines.yaml
+  - orbit_rings
+  - random
+  - fvs
+  - volumetric_ig
+  - roi_coverage
+  - {label: coverage_oracle_strict, method: coverage_oracle, overrides: [coverage.match_max_deg=15, coverage.min_overlap=0.5]}

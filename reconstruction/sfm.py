@@ -18,7 +18,7 @@ Sim3-aligned to the rig's camera centres (EKF2, `frames.jsonl` pose) and, in the
 Completeness is measured against the scene's proxy surface (recon/coverage.py): a surface point counts as reconstructed when a
 sparse point lies in its voxel neighbourhood after the EKF2 alignment. Reads the run directory only (dependency rule).
 
-Writes results/<run>/sfm/{database.db, sparse/<k>/, points.ply, metrics.json}.
+Writes data/<run>/sfm/{database.db, sparse/<k>/, points.ply, metrics.json}.
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ import numpy as np
 import yaml
 
 from kinetix.align import apply, ate, umeyama
-from kinetix.config import RESULTS, SCENES, load_scene
+from kinetix.config import SCENES, load_scene
 from kinetix.coverage import CoverageState
 from kinetix.types import Intrinsics
 
@@ -199,6 +199,21 @@ def known_pose_model(db_path: Path, image_root: Path, out: Path, frames: list[di
     return rec
 
 
+def mapper_options(threads: int = -1, init_min_tri_angle: float = 4.0, init_min_num_inliers: int = 50):
+    """Incremental mapping with the run's intrinsics fixed (shared by run_sfm and reconstruction/evaluate.py's prefixes)."""
+    import pycolmap
+    opts = pycolmap.IncrementalPipelineOptions()
+    opts.ba_refine_focal_length = False
+    opts.ba_refine_principal_point = False
+    opts.ba_refine_extra_params = False
+    opts.num_threads = threads
+    opts.mapper.init_min_tri_angle = float(init_min_tri_angle)
+    opts.mapper.init_min_num_inliers = int(init_min_num_inliers)
+    opts.min_model_size = 3
+    opts.random_seed = 0
+    return opts
+
+
 def _coverage_for(head: dict, scene_file: Path) -> CoverageState:
     scene = load_scene(scene_file)
     cfg = head["config"]
@@ -220,7 +235,7 @@ def run_sfm(run: Path | str, scene_path: Path | str | None = None, max_features:
     frames = [f for f in _frames(run) if f.get("image")]
     if len(frames) < 3:
         raise SystemExit(f"{run}: {len(frames)} frames with images, need >= 3")
-    out = RESULTS / run.name / "sfm"
+    out = run / "sfm"
     if out.exists():
         shutil.rmtree(out)
     (out / "sparse").mkdir(parents=True)
@@ -263,14 +278,7 @@ def run_sfm(run: Path | str, scene_path: Path | str | None = None, max_features:
     checked = rig_check_pairs(db, frames) if rig_check else None
     n_priors = 0                                         # set below for pose_source=sfm
     t_match = time.time() - t0 - t_feat
-    opts = pycolmap.IncrementalPipelineOptions()
-    opts.ba_refine_focal_length = False
-    opts.ba_refine_principal_point = False
-    opts.ba_refine_extra_params = False
-    opts.num_threads = threads
-    opts.mapper.init_min_tri_angle = float(init_min_tri_angle)
-    opts.mapper.init_min_num_inliers = int(init_min_num_inliers)
-    opts.min_model_size = 3
+    opts = mapper_options(threads, init_min_tri_angle, init_min_num_inliers)
     if pose_source == "sfm" and prior_sigma_m:
         n_priors = write_position_priors(db, frames, prior_sigma_m)
     if n_priors:
@@ -348,6 +356,8 @@ def _dropped_floor(scene, spacing: float) -> int:
 
 
 def _scene_from_run(head: dict) -> Path | None:
+    if head.get("scene_path") and Path(head["scene_path"]).exists():   # the scene file the run flew (data-format.md §3)
+        return Path(head["scene_path"])
     p = SCENES / f"{head.get('scene')}.yaml"
     return p if p.exists() else None
 

@@ -3,8 +3,48 @@
 Current phase: **K1**, with a room-capture track run ahead of it (ADR-K11, ADR-K12). Phase definitions and exit tests:
 [roadmap.md](../roadmap.md). The evidence for each done item is in the ADR it names and in its run directory.
 
+## Testbed: one scene first (2026-11-05)
+- [x] Scene set cut to `office_buddha` for the object testbed: `office_monster` and `office_chair` recipes deleted from `sim/scenes/`,
+  `config/bench/{baselines,dense,oracle}.yaml` use `scenes: [office_buddha]`. Old bench outputs in `$KINETIX_DATA/bench/` still hold their cells.
+- [ ] Build and validate the pipeline on `office_buddha` (S1–S4; roadmap.md). No claim from one scene.
+- [ ] S5: add scenes back to 8–10 (≥ 3 GSO/Objaverse++), incl. `office_monster` (dark, low texture) and `office_chair` (no colour):
+  restore the recipes from git, rebuild with `sim/build_scene.py`, `kinetix pool make --scene <s>`, re-run the bench matrices.
+  Freeze planner weights on `office_buddha` before the new scenes run.
+
+## Structure and research framing (2026-11-02)
+- [x] One method table, `acquisition/planner/methods.py`: loop, fixed/scored, surface (box | gt | depth), needs depth, and
+  `uses_gt(method, rig)`. `kinetix/cli.py`, `planner/loop.py` and `planner/nbv.py` read it instead of testing method names
+  (`DEPTH_METHODS` and the rig-name check in cli.py are gone). Behaviour unchanged; `acquisition/tests/test_methods.py`.
+  The method × rig table (oracle to real flight) is architecture.md §3a.
+- [x] Docs: `docs/README.md` (index, reading paths, how to debug a run); methodology.md §2.1 (each stage's peer-reviewed
+  evidence, refs [51]–[61] added to related_work.md, [54] and [58]–[61] still to Crossref-check); paper/research-questions.md and
+  ADR-K14 (**proposed**: RQ1–RQ4, K-A–K-D, N@q as a metric); roadmap "Steps to submission" S1–S8 by RQ.
+- [ ] Both authors accept or reject ADR-K14; on acceptance replace publication-plan.md §2 and CLAUDE.md's C1–C5 line.
+- [ ] Novelty sweep for K-A (registration-aware view planning, research-questions.md §4) before S2's result is called a contribution.
+- [x] Debug aids (docs/README.md "Debug a run"): every frame/step checked as written (`WARN` in log.txt, `summary.warnings`),
+  Python/numpy warnings into log.txt, a crash closes the run with `stop_reason: error` + traceback, `kinetix run --strict` raises
+  at the first NaN/warning/problem, `kinetix check <runs>` gates each step (kinetix/checks.py, kinetix/tests/test_checks.py).
+  First `kinetix check data/2*` (2026-11-02): 5 isaac runs of `depth_coverage` / `surface_normal` (261031-220608, -231423,
+  -231433, -231556, -231615) say `uses_gt: false` but read renderer GT depth (written before methods.py): never count them as
+  GT-free. 261031-213914 died without a summary; 20261028-163032 has no run.yaml (old layout).
+- [ ] Both authors decide the two-paper split (research-questions.md §6: planning paper at IROS 2027, deadline 2027-03-01;
+  reconstruction paper later); on acceptance update publication-plan §5 (shared path, own PR).
+
 ## Now — room photogrammetry (Warehouse, `kinetix/scenes/warehouse_room.yaml`)
 How to run it: `METHOD=tour scripts/room_scan.sh all` (sim up, fly, `kinetix sfm`), or [architecture.md](architecture.md) §5a.
+- [ ] **Config split, room height, experiments (2026-10-30)**: `acquisition/config/default.yaml` is now `common.yaml` (camera, rig,
+  shared keys) + `object.yaml` (rings, orbit, object coverage/planner) or `room.yaml` (grid, tour, and `explore`, moved here), picked by
+  the scene's `kind`; the merged configs are unchanged apart from the height keys below. Room height: the band follows the room,
+  1.1 m over the floor to 1.0 m under the ceiling (`explore.fit.altitude_above_floor_m: [1.1, null]`, was a 4.9 cap; one rule,
+  `kinetix/config.py` `altitude_band`): from the fitted room with `--explore`, from the room box for a scene file with
+  `altitude_m: auto` (warehouse_room.yaml since 2026-10-30, was [1.1, 4.9]; now map 1.22..8.12, workspace z follows). Exploration
+  itself keeps a fixed search band (`explore.altitude_m` [1.1, 4.9]). `planner.grid.heights: auto` fills the band with layers
+  `<= layer_m` 1.0 m apart. Dry Warehouse tour: coverage 0.987 / 98 m (fixed band + 3 layers: 0.964 / 101 m); the plan uses z
+  1.2..5.2 only, the upper layers win no viewpoint in the dry model. Not flown yet: the roof beams (8.8 m) now count as obstacles
+  within `obstacle_reach_m` of the band (unit test `test_fit_puts_the_wall...`). Experiments: overlays `acquisition/config/experiments/{close, dense,
+  sparse, fine_grid, slow, traditional}.yaml` (`--config`, or `room_scan.sh --experiment NAME`; each sets `experiment:` in run.yaml),
+  compared by SfM result with `uv run python -m acquisition.compare` (one row per run + the config keys that differ). Next: fly each
+  overlay twice in the Warehouse with `--explore`, then `kinetix sfm` + compare.
 - [x] **Pose + depth per frame (2026-10-27)**: `rig.save_depth` (on for room scenes, `acquisition/config/room.yaml`) saves the ZED `depth_registered` of every
   keyframe to `data/<run>/depth/<idx>.npy` (float32 m, NaN/inf = no return, matched to the image by stamp) and records it in
   `frames.jsonl` (`depth`, `depth_source: zed`); recorded only, never a planner input (interfaces.md §4, data-format.md §3). Old `data/` purged
@@ -123,7 +163,12 @@ How to run it: `METHOD=tour scripts/room_scan.sh all` (sim up, fly, `kinetix sfm
   from closer views, as far as ATE and the 0.25 m completeness proxy can tell (neither sees GSD). Exploration at max_steps 20 is
   marginal in the Warehouse (2 of 4 flights missed the y- end after a first move that saw ~0 frontier). Next: the control, budget
   120 at a flat 12 m (more views, not closer), and a resolution metric (GSD / point density on the true surface) before trading
-  flight time for distance
+  flight time for distance.
+  Repeat (`20261029-194829`, same config as `132346`, fresh sim, after the rebase on main): explore reached the y- end (34 views,
+  max wall error 0.41 m), 990 frames, 384 m, 17.7 min wall, coverage 0.97. SfM: all 990 registered, 49 k points, track 6.2,
+  completeness 0.54 (walls 0.52, floor 0.58, ceiling 0.53, as `132346`); ATE rmse 0.52 m, but that is 5 explore views
+  (900005-900026, 1.6-12.5 m off, the explore-view BA bug of `163032`): without them rmse 0.24, median 0.16 (was 0.096). EKF2 vs
+  GT p50 0.57 m, max 1.0 m over the flight
 - [ ] Explore, pose after big turns: capture only once the VIO has settled (spikes of 4-5.5 deg / 0.3-0.6 m for seconds), or slower
   turns while exploring; bisg side: why the ZED/EKF yaw jumps after a turn (map_correction / compass in the zed bridge)
 - [x] Room fit: obstacles must reach within `fit.obstacle_reach_m` (1 m) of the workspace (2026-10-27): roof beams at 8 m dropped
@@ -151,6 +196,47 @@ How to run it: `METHOD=tour scripts/room_scan.sh all` (sim up, fly, `kinetix sfm
   and the process segfaulted (rc 139) on that exit
 
 ## Next (K1)
+- [x] **T1 without flight (2026-10-31):** `sim/render_server.py` (batch + serve) + rig `isaac` (`acquisition/rig/isaac_render.py`,
+  `scripts/render_server.sh`): every view rendered at the exact pose, a 20-view run in ~4 s instead of a 3-6 min flight + sim restart.
+  The reference flights aim at. `office_buddha`, seed 0, points of the sparse model vs the GT statue (median / share within 1 cm):
+
+  | method | rig | views | SfM registered | points on object | median | <1 cm |
+  |---|---|---|---|---|---|---|
+  | roi_coverage | isaac (T1) | 11 | 9/11 incremental, 11/11 known-pose | 286 / 287 | 2.1 / 3.0 mm | 0.98 |
+  | roi_coverage | mavros (T2) | 11 | 9/11 | 396 | 21.8 mm | 0.22 |
+  | surface_normal | isaac (T1) | 19 | 8/19 incremental, 19/19 known-pose | 715 / 1498 | 0.4 / 6.4 mm | 1.00 / 0.99 |
+  | surface_normal | mavros (T2) | 20 | 9/20 | 811 | 23.6 mm | 0.10 |
+
+  Reading: on flights the error is the EKF2 pose (3-7 cm) carried into the model; with exact poses the same images give mm. Incremental
+  SfM registers about half the views even on perfect images (the object fills a small part of a 100 deg view): reconstruction, not
+  acquisition, is the limit here. Open: known-pose mode sits 3-6 mm off where incremental + Sim3 sits 0.4-2 mm (focal is fixed at
+  529.8 in both: check the render camera's pose/intrinsics convention); MRGCS can start only `--rig mavros`
+- [x] **Planning without SfM in the loop (2026-10-31):** the coverage model (kinetix/coverage.py) now also scores views on a real
+  surface: `coverage_oracle` = NBV on the scene's GT-visible surface (`gt_observable.npz`, sim only, `uses_gt: true`), `depth_coverage`
+  = NBV on the box until `planner.depth_surface.after_views` (4), then on the depth patches those views saw + the still-unseen box.
+  Objects now require SfM-matchable rays (`coverage.match_max_deg` 30, `min_overlap` 0.2; object.yaml). T1 (`--rig isaac`), seed 0,
+  scored on common ground (incremental SfM vs the GT statue; patch completeness = 4 cm GT patches with a model point within 2 cm):
+
+  | method (match deg / overlap) | images | registered | points on object | patch completeness |
+  |---|---|---|---|---|
+  | orbit | 20 | 20/20 | 1029 | 0.248 |
+  | roi_coverage (30 / 0.2, the new default) | 20 | 20/20 (9/11 before matchability) | 1267 | 0.265 |
+  | depth_coverage (30 / 0.2) | 20 | 20/20 | 707 | 0.204 |
+  | coverage_oracle (30 / 0.2) | 20 | 13/20 | 298 | 0.114 |
+  | coverage_oracle (20 / 0.3) | 20 | 20/20 | 674 | 0.243 |
+  | **coverage_oracle (15 / 0.5)** | **14** | 14/14 | 1233 | **0.272** |
+  | roi_coverage / depth_coverage (15 / 0.5) | 3 | 3/3 | ~240 | ~0.09 (stall: the box proxy cannot meet 50 % overlap) |
+  | roi_coverage (20 / 0.3) | 20 | 20/20 | 952 | 0.238 |
+  | depth_coverage (20 / 0.3) | 13 | 13/13 | 633 | 0.196 |
+  | surface_normal | 19 | 9/19 | 791 | 0.154 |
+
+  Reading: the reconstructability rule must be calibrated to SfM, and per surface: on the true surface strict (15 deg / 0.5) is
+  best and reaches roi_coverage's completeness with 14 images instead of 20 (the reference), lenient (30 / 0.2) misleads the
+  oracle; on the box proxy strict stalls. depth_coverage does not beat the box yet. One seed each: run seeds 0-4 before any
+  claim; sparse-point completeness is a stand-in until densify (reconstruction todo). Next: a better realistic surface
+  (depth patches all round, e.g. from the coarse orbit as in surface_normal) with the strict rule, measured against the oracle
+- [x] Method `surface_normal` (planner/surface.py, the benchmark's explore_exploit after Liu 2026): flown 2026-10-31
+  (`261031-214529`, 8 coarse + 12 close views at 0.71-0.81 m, transits round the object, all views inside the scene rules)
 - [ ] Review ADR-K10 (pools with SDK depth via the twin); if accepted, `render_server.py --zed-depth` builds on bisg's
   `docker/sim/tools/zed_pool_probe.py` pattern
 - [ ] Review the ROS 2 pipeline proposal (`docs/acquisition/ros-pipeline.md`, ADR-K09). On acceptance, move its §3/§4 tables into interfaces.md §4/§5
@@ -158,7 +244,8 @@ How to run it: `METHOD=tour scripts/room_scan.sh all` (sim up, fly, `kinetix sfm
 - [ ] Review the contribution wording C1–C5 (`paper/publication-plan.md` §2) and the venue plan (§5)
 - [ ] Check asset licences (SimReady, Objaverse++, GSO, OmniObject3D) before fixing the object set
 - [ ] Arrange the real-object scanner for K6 GT (Q4), needed by G3
-- [ ] Set `KINETIX_DATA` in `.env`; move `kinetix/scenes/` there with scene.usd / gt_mesh (`.env` exists, the key does not)
+- [ ] Move `kinetix/scenes/` to `$KINETIX_DATA` (`KINETIX_DATA=/opt/kinetix-data` set in workstation A's `.env` 2026-10-31; the
+  room scenes still live in git)
 - [x] Switch `tool.uv.package = true` (2026-10-28, hatchling backend): `uv run pytest` 59 passed, `uv run python -m kinetix` works
 - [x] Flat two-author layout (2026-10-29): `kinetix/` shared lib (+ `scenes/`), `acquisition/` (planner, mapping = old `recon/`, rig,
   config), `reconstruction/` (old `offline/`), flights `data/` (was `runs/`), outputs `results/<run>/<method>/` (was `<run>/sfm/offline/`),
@@ -166,10 +253,55 @@ How to run it: `METHOD=tour scripts/room_scan.sh all` (sim up, fly, `kinetix sfm
   MRGCS `kinetix_bridge.py` follows. 58 passed (uv and the kinetix image). docs/ follows the same split: shared docs at the top,
   `acquisition/` (architecture §5-8 split out, ros-pipeline, todo), `reconstruction/` (pipeline = old architecture §9, todo),
   `paper/` (publication-plan, benchmark, research/ with space-free names); 91 relative links checked
-- [ ] Q3: a bisg change so the sim container can read `$KINETIX_DATA/scenes` (not done: bisg's compose has no such mount)
-- [ ] First object scene: pick the object, build `scene.usd` / `gt_mesh.ply` / `scene.yaml` (the bisg sim has no scan objects now)
-- [ ] `sim/render_server.py` batch mode + `kinetix pool make`
-- [ ] `acquisition/rig/pool.py`, `acquisition/mapping/state.py` v1 (pycolmap ReconState replaces the coverage proxy online)
+- [x] Q3 (2026-10-31): bisg mounts `SCENES_DIR` (= `$KINETIX_DATA/scenes`) read-only at `/scenes`; a scene's `bisg.yaml` locator is
+  `-c` / `SIM_SCENARIO`. The kinetix container mounts `$KINETIX_DATA` at its host path (docker/compose.yaml)
+- [x] First object scene `office_buddha` (2026-10-31): recipe `sim/scenes/office_buddha.yaml` -> `sim/build_scene.py` -> `$KINETIX_DATA/scenes/`
+  (Smithsonian Cosmic Buddha laser scan, CC0, 150k tris + 4k texture, in the Isaac Office lobby, CC BY 4.0; scene lights: the
+  Office's own lamps are authored invisible). Flown on fresh sims: `roi_coverage` s0 13 views (gain plateau), cov 0.86, SfM 11/13,
+  ATE 0.7 cm (`261031-012800`); s1 20 views (budget), cov 0.94, SfM 12/20, 1076 pts, ATE 1.6 cm (`261031-021929`).
+  **One capture per sim run:** a 2nd flight on the same sim (`261031-013603`) held position but yaw swung +-15 deg (period ~12 s,
+  EKF2 = truth, so the vehicle really turned) and timed out 13x on the 3 deg settle; the same seed on a restarted sim was clean. Runs record `summary.map_shift` (measured - scene world_to_map; z varies
+  ~0.2 m per run, the Warehouse too): GT + map_shift = the run's map. Open: SfM/densify scored against `gt_observable.ply`
+  (reconstruction), lighting probe like the Warehouse's, 2 more objects (Q2)
+- [ ] **Validation to the flight gate (2026-11-01, [methodology.md](../methodology.md))**: method stages M0–M9 and checks V0–V8; no
+  new T2 work for the object paper before the flight gate (§5). Built: `coverage.k_min` + `MeshOcclusion` (the oracle now sees GT
+  self-occlusion; `kinetix/tests/test_coverage_occlusion.py`), `bench/validate.py` (V3: sparse ρ 0.54–0.56, fails until dense),
+  `densify` + `runs_from` bench keys, `config/bench/{dense,oracle}.yaml` (running, ~12 h), `acquisition/mapping/monodepth.py`
+  (DA-V2 + SfM anchoring, `test_monodepth.py`), `acquisition/tests/anchor_bench.py` (V5a: AbsRel 0.035 anchored vs 0.20 metric
+  no-anchor on Buddha). Dense results (2026-11-01, `bench/dense` + `bench/oracle`): V1 F_ref 0.86–0.93 (Chair never reaches
+  0.9: q relative to F_ref is open), V3 coverage → completeness ρ 0.76 (`k_min` 3, passes), overlap → registered ρ 0.24 (fails),
+  V4 fails (oracle ≥ best non-GT in 1 of 24 cells: it spreads views and loses them in SfM). Next: a registration model that
+  predicts SfM registration (methodology §8 2b), re-run the oracle, then V5a with online-sized anchors, ReconState (V5c)
+- [x] **K2 harness + first baseline matrix (2026-11-01, roadmap reformed the same day):** `kinetix pool make` (ring-stack pool, 192
+  views, ~90 s/scene) + rig `pool` (T0), `kinetix eval` (reconstruction/metrics.py, evaluate.py), `kinetix bench` (bench/matrix.py,
+  report.py: budget prefixes, N@q, image reduction, Kendall's tau), baselines `orbit_rings`, `fvs`, `volumetric_ig`, bench seeds,
+  scenes `office_monster` + `office_chair` (Smithsonian CC0, on a plinth). `config/bench/baselines.yaml`: 3 scenes x 9 methods x
+  3 seeds x N 5-80, ~35 min on 6 jobs → `$KINETIX_DATA/bench/baselines/report.md`. F@1 % of D (sparse points), mean of 3 seeds:
+
+  | method | buddha N=20 / 80 | monster N=20 / 80 | chair N=20 / 80 |
+  |---|---|---|---|
+  | orbit (1 ring, ≤ 24) | 0.39 / 0.44 | 0.56 / 0.63 | 0.03 / 0.05 |
+  | orbit_rings | 0.07 / 0.61 | 0.23 / 0.85 | 0.00 / 0.22 |
+  | random | 0.13 / 0.57 | 0.22 / 0.81 | 0.01 / 0.23 |
+  | fvs | 0.00 / 0.59 | 0.00 / 0.82 | 0.00 / 0.20 |
+  | volumetric_ig † | 0.23 / **0.64** | **0.50 / 0.89** | **0.13 / 0.28** |
+  | roi_coverage | 0.23 / 0.54 | 0.38 / 0.82 | 0.01 / 0.19 |
+  | depth_coverage † | 0.23 / 0.52 | 0.28 / 0.79 | 0.00 / 0.23 |
+  | coverage_oracle † (30° / 0.2) | 0.00 / 0.50 | 0.24 / 0.76 | 0.01 / 0.20 |
+  | coverage_oracle † (15° / 0.5) | 0.28 / 0.28 (stops ~14) | 0.29 / 0.30 | 0.08 / 0.13 |
+  | reference (192 views) | 0.76 | 0.94 | 0.40 |
+
+  † reads GT (oracle surface, or rendered GT depth). Readings: (1) **N@q is not measurable yet**: on sparse points F keeps rising
+  with the image count, so nothing reaches 0.9 x F_ref by 80 views except volumetric_ig on the monster (N@0.9 = 57); densify first
+  (reconstruction todo). (2) **Spread views do not register**: `fvs` / `orbit_rings` at 5-20 views are 30-90 deg apart and incremental
+  SfM chains 0-40 % of them (eval_valid false = F 0); the matchability-aware planners register from N = 5. (3) **The K2 oracle check
+  fails**: neither coverage_oracle beats every baseline (lenient misleads, strict stops at ~14 views: no view keeps 50 % overlap),
+  so the coverage model, not the evaluation, is what is wrong; volumetric_ig with GT depth is the best method on all three scenes.
+  (4) office_chair (no colour texture) is hard for everyone (F_ref 0.40). (5) T0 vs T1 (`config/bench/tiers_t1.yaml`, office_buddha,
+  6 methods x 3 seeds, sessions in the kinetix container, scored on the host): ranking tau = 0.87, F@80 within 0.035 for 5 of 6
+  methods (volumetric_ig 0.644 vs 0.587) → `$KINETIX_DATA/bench/tiers/report.md`. The ring stack's 2.0 m ring sees little of
+  the 0.9 m objects with a level camera (Q1 mount pitch / per-scene rings)
+- [ ] `acquisition/mapping/state.py` v1 (pycolmap ReconState replaces the coverage proxy online)
 - [ ] `tests/fixtures/pool_tiny/` (git-lfs)
 - [ ] ZED image stamps are wall clock in the sim (the rig takes the first image *received* after settle)
 

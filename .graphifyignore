@@ -1,0 +1,2 @@
+# run outputs (large files live on the data release; run.yaml/logs are artifacts, not project knowledge)
+data/

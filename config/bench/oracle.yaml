@@ -1,0 +1,13 @@
+# V4 (methodology.md §4.1): the GT-surface oracle with self-occlusion (MeshOcclusion, always on for coverage_oracle since
+# 2026-11-01) and k_min views a point; fresh sessions, dense scoring like bench `dense` (compare against its rows).
+# `uv run python -m kinetix bench --matrix config/bench/oracle.yaml --jobs 2`
+name: oracle
+rig: pool
+densify: {backend: colmap_mvs, max_image_size: 640, num_src: 8, geom: false}
+scenes: [office_buddha]
+budgets: [10, 20, 40, 80]
+seeds: [0, 1, 2]
+overrides: [planner.coverage_target=2.0, planner.min_gain=-1.0]
+methods:
+  - {label: oracle_k2, method: coverage_oracle, overrides: [coverage.k_min=2]}
+  - {label: oracle_k3, method: coverage_oracle, overrides: [coverage.k_min=3]}

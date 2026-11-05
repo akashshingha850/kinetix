@@ -1,0 +1,19 @@
+[     0.0s] run 261031-213914_office_buddha_surface_normal: scene office_buddha (object), method surface_normal, rig mavros, budget 20
+[     0.0s] coverage model: 2928 surface points, 0 occluders
+[    20.3s] scene shifted by [-0.003, -0.002, 0.231] m (measured map origin vs the scene's world_to_map)
+[    20.3s] coarse 0: -> r1.60_z1.35_a180
+[    32.6s] frame 0: coverage 0.000, pose err 0.023 m
+[    32.6s] coarse 1: -> r1.60_z1.35_a225
+[    46.4s] frame 1: coverage 0.210, pose err 0.031 m
+[    46.4s] coarse 2: -> r1.60_z1.35_a270
+[    60.2s] frame 2: coverage 0.333, pose err 0.049 m
+[    60.2s] coarse 3: -> r1.60_z1.35_a315
+[    73.7s] frame 3: coverage 0.336, pose err 0.038 m
+[    73.7s] coarse 4: -> r1.60_z1.35_a000
+[    86.8s] frame 4: coverage 0.555, pose err 0.036 m
+[    86.8s] coarse 5: -> r1.60_z1.35_a045
+[    99.8s] frame 5: coverage 0.562, pose err 0.058 m
+[    99.8s] coarse 6: -> r1.60_z1.35_a090
+[   113.0s] frame 6: coverage 0.685, pose err 0.037 m
+[   113.0s] coarse 7: -> r1.60_z1.35_a135
+[   125.5s] frame 7: coverage 0.696, pose err 0.034 m

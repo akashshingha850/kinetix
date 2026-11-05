@@ -1,5 +1,8 @@
 # Kinetix: Adaptive Dynamic Photogrammetry for Indoor Objects with Monocular Drone Imaging
 
+> **Superseded (2026-11-02).** Kept as the original pitch. The current questions and claims are in
+> [../research-questions.md](../research-questions.md), the plan in [../../roadmap.md](../../roadmap.md).
+
 ## Project Overview
 Kinetix is a novel system that enables efficient, high-quality 3D reconstruction of indoor objects using a monocular drone. Unlike traditional photogrammetry pipelines that rely on dense, pre-defined waypoint grids or circular orbits, Kinetix uses **dynamic, adaptive camera pose planning** to intelligently select the next best views in real-time (or near real-time), significantly reducing the number of required images while improving reconstruction quality.
 

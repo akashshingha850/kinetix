@@ -1,6 +1,7 @@
 """Room scenes (ADR-K11): inside-out coverage, occlusion, matchable-angle rules, grid candidates, room constraints, Sim3."""
 
 import numpy as np
+import pytest
 
 from acquisition.planner.constraints import BoxConstraints
 from acquisition.planner.loop import run_session
@@ -91,6 +92,14 @@ def test_grid_heights_outside_the_workspace_are_clipped_not_dropped():
     assert sorted(set(np.round(z, 3))) == [0.9, 2.0, 3.0]
     feas = BoxConstraints(0.5, 0.45).feasible(cands, camera_pose(SCENE.standby, 0.0), SCENE)
     assert feas[np.isclose(z, 0.9)].any() and feas[np.isclose(z, 3.0)].any()  # the clipped layers can be flown
+
+
+def test_auto_grid_heights_fill_the_altitude_band():
+    z = lambda layer: sorted({round(c.pose.p[2], 3) for c in grid_poses(SCENE, CAPS, 1.0, "auto", 4, layer)})
+    assert z(1.0) == [0.9, 1.6, 2.3, 3.0]                                      # band 0.9..3.0, layers <= 1 m apart, edges included
+    assert z(2.1) == [0.9, 3.0] and z(5.0) == [0.9, 3.0]
+    with pytest.raises(ValueError):
+        grid_poses(SCENE, CAPS, 1.0, "auto", 4)                               # auto needs layer_m
 
 
 def test_umeyama_recovers_a_sim3():

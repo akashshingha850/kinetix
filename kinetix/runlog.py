@@ -5,10 +5,12 @@ import json
 import platform
 import subprocess
 import time
+import warnings
 from pathlib import Path
 
 import yaml
 
+from kinetix.checks import frame_problems, step_problems
 from kinetix.types import Frame
 
 FORMAT = 1
@@ -27,20 +29,33 @@ def _git(root: Path) -> dict:
 
 class RunLog:
     def __init__(self, out_root: Path | str, scene: str, method: str, rig: str, seed: int, cfg: dict, uses_gt: bool,
-                 repo_root: Path | None = None, tag: str = ""):
-        # tag (e.g. explore-optimized) only names the run dir: run.yaml keeps `method`, which kinetix sfm reads
-        self.run_id = f"{time.strftime('%Y%m%d-%H%M%S')}_{scene}_{method}{'-' + tag if tag else ''}_{rig}_s{seed}"
+                 repo_root: Path | None = None, tag: str = "", scene_path: Path | str | None = None, strict: bool = False):
+        # tag (e.g. explore-opt) only names the run dir; rig and seed are in run.yaml, not the name (data-format.md §3)
+        self.run_id = f"{time.strftime('%y%m%d-%H%M%S')}_{scene}_{method}{'-' + tag if tag else ''}"
+        base, k = self.run_id, 1
+        Path(out_root).mkdir(parents=True, exist_ok=True)
+        while True:                                         # two runs of one scene+method in the same second (parallel bench seeds)
+            try:
+                (Path(out_root) / self.run_id).mkdir()
+                break
+            except FileExistsError:
+                k += 1
+                self.run_id = f"{base}-{k}"
         self.dir = Path(out_root) / self.run_id
-        (self.dir / "frames").mkdir(parents=True, exist_ok=True)
+        (self.dir / "frames").mkdir()
         self.t0 = time.time()
         self.frames = 0
         self.travel_m = 0.0
+        self.warnings, self.strict = 0, strict
         self.head = {"format": FORMAT, "kinetix": {"version": "0.1.0", **(_git(repo_root) if repo_root else {})},
-                     "env": {"host": platform.node()}, "scene": scene, "rig": {"name": rig}, "method": method,
+                     "env": {"host": platform.node()}, "scene": scene,
+                     **({"scene_path": str(scene_path)} if scene_path else {}), "rig": {"name": rig}, "method": method,
                      "sensing": {"preset": "mono", "plan_depth": "none", "recon_input": "left"},
                      "uses_gt": uses_gt, "seed": seed, "config": cfg}
         self._write_run_yaml()
         self._log = open(self.dir / "log.txt", "a", buffering=1)
+        self._showwarning = warnings.showwarning          # Python/numpy warnings go to log.txt too, not only to a scrolled-away stderr
+        warnings.showwarning = lambda m, c, f, n, *_: self.warn(f"{c.__name__}: {m} ({Path(f).name}:{n})")
 
     def _write_run_yaml(self, summary: dict | None = None):
         doc = dict(self.head)
@@ -53,20 +68,33 @@ class RunLog:
         print(line, flush=True)
         self._log.write(line + "\n")
 
+    def warn(self, msg: str):
+        """A consistency problem (kinetix/checks.py) or a warning: counted in the summary; `--strict` stops the run on it."""
+        self.warnings += 1
+        self.info(f"WARN {msg}")
+        if self.strict:
+            raise RuntimeError(f"--strict: {msg}")
+
     def frame(self, f: Frame):
         self.frames += 1
         self.travel_m += f.travel_m
+        d = f.to_dict()
         with open(self.dir / "frames.jsonl", "a") as fh:
-            fh.write(json.dumps(f.to_dict()) + "\n")
+            fh.write(json.dumps(d) + "\n")
+        for p in frame_problems(d, self.dir):
+            self.warn(p)
 
     def step(self, rec: dict):
         with open(self.dir / "steps.jsonl", "a") as fh:
             fh.write(json.dumps(rec) + "\n")
+        for p in step_problems(rec):
+            self.warn(p)
 
     def close(self, stop_reason: str, extra: dict | None = None):
         summary = {"frames": self.frames, "registered": None, "travel_m": round(self.travel_m, 2),
-                   "wall_s": round(time.time() - self.t0, 1), "sim_s": None, "stop_reason": stop_reason, **(extra or {})}
+                   "wall_s": round(time.time() - self.t0, 1), "sim_s": None, "stop_reason": stop_reason, "warnings": self.warnings, **(extra or {})}
         self._write_run_yaml(summary)
         self.info(f"run closed: {summary}")
+        warnings.showwarning = self._showwarning
         self._log.close()
         return summary

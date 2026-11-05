@@ -1,5 +1,7 @@
 """Stepwise next-best-view (architecture.md §4, §7): score the feasible candidates, fly to the best, capture, repeat until
-the stop rule fires. Methods roi_coverage, random (planner/scorers) and orbit (fixed-sequence baseline)."""
+the stop rule fires. Methods roi_coverage, random, fvs, volumetric_ig (planner/scorers) and the fixed sequences orbit (one ring)
+and orbit_rings (every ring, golden-angle order: each prefix is an evenly spread N-view capture, paper/benchmark.md §1).
+`seed`: 0 starts at the view nearest the rig (the flight default), k > 0 at a seeded random feasible view (bench seeds)."""
 from __future__ import annotations
 
 import time
@@ -8,8 +10,9 @@ import numpy as np
 
 from acquisition.planner.constraints import BoxConstraints
 from acquisition.planner.loop import apply_shift
+from acquisition.planner.methods import METHODS
 from acquisition.planner.sampler import GridSampler, RingSampler
-from acquisition.planner.scorers import SCORERS
+from acquisition.planner.scorers import make_scorer
 from kinetix.geometry import camera_yaw, wrap
 from kinetix.types import Candidate, Pose, RigError, Scene
 
@@ -51,6 +54,52 @@ def orbit_order(cands: list[Candidate], current, radius: float, height: float) -
     return ring[start:] + ring[:start]
 
 
+def spread_order(cands: list[Candidate], current, seed: int = 0) -> list[int]:
+    """Fixed-sequence baseline over every ring: view k is on ring k mod n_rings (rings by radius, then height) at azimuth
+    a0 + k x 137.5 deg (the golden angle), snapped to the ring's nearest untaken view; a0 faces the current camera (seed 0) or
+    is seeded. Every prefix is spread evenly over azimuth and height."""
+    keys = [tuple(c.pool_id.split("_a")[0].split("_")) for c in cands]
+    rings = sorted(set(keys), key=lambda k: (float(k[0][1:]), float(k[1][1:])))
+    by_ring = {r: [i for i, k in enumerate(keys) if k == r] for r in rings}
+    az = np.array([float(c.pool_id.split("_a")[1]) for c in cands])
+    if seed:
+        a0 = np.random.default_rng(seed).uniform(0, 360)
+    else:
+        a0 = az[min(range(len(cands)), key=lambda i: np.linalg.norm(cands[i].pose.p - current.p))]
+    order, taken = [], set()
+    for k in range(len(cands)):
+        ring = by_ring[rings[k % len(rings)]]
+        free = [i for i in ring if i not in taken]
+        a = (a0 + 137.50776 * k) % 360
+        i = min(free, key=lambda i: abs((az[i] - a + 180) % 360 - 180))
+        order.append(i)
+        taken.add(i)
+    return order
+
+
+def depth_surface(recon, frames, scene: Scene, cfg: dict, log):
+    """depth_coverage: swap the ROI-box proxy for the surface the first views' depth shows (patches of coverage.spacing_m with a
+    plane-fit normal, planner/surface.py), plus the box points nothing has seen yet (the far side is still unknown, so it stays
+    a box and keeps drawing views there). The frames so far are re-added, so the stop rule and the gains carry on."""
+    from acquisition.planner.surface import backproject, surface_patches
+    from kinetix.coverage import CoverageState
+    ds = cfg["planner"]["depth_surface"]
+    parts = [backproject(f, scene.roi, ds["floor_margin_m"]) for f in frames if f.depth is not None]
+    if not parts:
+        log.info("depth_coverage: no depth on the first views (rig.save_depth): keeping the box proxy")
+        return recon
+    P = np.concatenate([p for p, _ in parts])
+    C, M = surface_patches(P, np.concatenate([c for _, c in parts]), cfg["coverage"]["spacing_m"], ds["min_points"])
+    unseen = recon.count == 0
+    surf = (np.concatenate([C, recon.P[unseen]]), np.concatenate([M, recon.N[unseen]]))
+    new = CoverageState.for_scene(scene, recon.K, cfg["coverage"], surf)
+    for f in frames:
+        new.add(f)
+    log.info(f"depth_coverage: surface from {len(frames)} views' depth: {len(C)} patches + {int(unseen.sum())} unseen box points, "
+             f"coverage {recon.coverage:.3f} -> {new.coverage:.3f}")
+    return new
+
+
 # ── stop rule: image budget, coverage target, or gain plateau ─────────────────────────────────────────────────────────
 class Stop:
     def __init__(self, budget: int, coverage_target: float = 0.95, min_gain: float = 0.005, patience: int = 2):
@@ -73,14 +122,18 @@ class Stop:
 def run_nbv(cfg: dict, scene: Scene, rig, recon, method: str, log, seed: int = 0) -> dict:
     pc = cfg["planner"]
     if scene.kind == "room":
-        if method == "orbit":
-            raise ValueError("orbit is an object baseline (rings around the ROI); a room scene has no orbit")
-        sampler = GridSampler(pc["grid"]["spacing_m"], pc["grid"]["heights"], pc["grid"]["n_yaw"])
+        if method in ("orbit", "orbit_rings"):
+            raise ValueError(f"{method} is an object baseline (rings around the ROI); a room scene has no orbit")
+        sampler = GridSampler(pc["grid"]["spacing_m"], pc["grid"]["heights"], pc["grid"]["n_yaw"], pc["grid"].get("layer_m"))
     else:
         sampler = RingSampler(pc["rings"]["radii"], pc["rings"]["heights"], pc["rings"]["n_az"])
     cons = BoxConstraints(pc["clearance_m"], pc["roi_clearance_m"])
     stop = Stop(pc["budget"], pc["coverage_target"], pc["min_gain"], pc["patience"])
-    scorer = None if method == "orbit" else (SCORERS[method](seed) if method == "random" else SCORERS[method]())
+    spec = METHODS[method]
+    fixed = spec.fixed
+    scorer = None if fixed else make_scorer(method, seed, scene, cfg)
+    rng = np.random.default_rng(seed)
+    frames = []
     blocked: set[str] = set()
     taken: set[str] = set()
     n = 0
@@ -90,19 +143,27 @@ def run_nbv(cfg: dict, scene: Scene, rig, recon, method: str, log, seed: int = 0
         rig.start()                                   # inside the try: a failed start still runs finish() (lands, stops the bag)
         scene = apply_shift(rig, scene, recon, log)
         cands = sampler.sample(scene, recon, rig.caps)
-        queue = orbit_order(cands, rig.pose(), pc["orbit"]["radius"], pc["orbit"]["height"]) if method == "orbit" else None
+        if method == "orbit":
+            queue = orbit_order(cands, rig.pose(), pc["orbit"]["radius"], pc["orbit"]["height"])
+            if seed:
+                k = int(rng.integers(len(queue)))
+                queue = queue[k:] + queue[:k]
+        elif method == "orbit_rings":
+            queue = spread_order(cands, rig.pose(), seed)
         last_gain = None
-        while not stop.done(recon, n, last_gain if n > pc["seed_views"] and method != "orbit" else None):
+        while not stop.done(recon, n, last_gain if n > pc["seed_views"] and not fixed else None):
             t0 = time.time()
             current = rig.pose()
             feas = cons.feasible(cands, current, scene, blocked | taken)
-            if method == "orbit":
+            if fixed:
                 i = next((j for j in queue if cands[j].pool_id not in taken | blocked and feas[j]), None)
                 gains = np.array([recon.gain(c.pose) for c in cands])     # logged only; the order is fixed
             elif n < pc["seed_views"]:                                     # seed: the nearest feasible view
                 gains = score_feasible(scorer, cands, feas, recon)
                 d = np.array([np.linalg.norm(c.pose.p - current.p) + 0.3 * abs(wrap(camera_yaw(c.pose) - camera_yaw(current)))
                               for c in cands])
+                if seed and feas.any():                                    # bench seeds: a seeded random first view
+                    d = np.where(feas, rng.uniform(size=len(cands)), np.inf)
                 i = int(np.argmin(np.where(feas, d, np.inf))) if feas.any() else None
             else:
                 gains = score_feasible(scorer, cands, feas, recon)
@@ -113,7 +174,7 @@ def run_nbv(cfg: dict, scene: Scene, rig, recon, method: str, log, seed: int = 0
             rec = {"step": n, "n_cands": len(cands), "n_feasible": int(feas.sum()), "chosen": None, "gain": None,
                    "top5": top, "t_score_s": round(t_score, 3), "coverage": round(recon.coverage, 4), "error": None}
             if i is None:
-                stop_reason = "sequence_done" if method == "orbit" else "no_feasible_view"
+                stop_reason = "sequence_done" if fixed else "no_feasible_view"
                 log.step(rec)
                 break
             c = cands[i]
@@ -137,6 +198,11 @@ def run_nbv(cfg: dict, scene: Scene, rig, recon, method: str, log, seed: int = 0
                 continue
             timeouts = 0
             seen = recon.add(frame)
+            if hasattr(scorer, "add"):
+                scorer.add(frame)
+            frames.append(frame)
+            if spec.surface == "depth" and len(frames) == pc["depth_surface"]["after_views"]:
+                recon = depth_surface(recon, frames, scene, cfg, log)
             taken.add(c.pool_id)
             last_gain = float(gains[i])
             rec["coverage"] = round(recon.coverage, 4)

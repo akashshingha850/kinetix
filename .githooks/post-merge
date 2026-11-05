@@ -3,6 +3,6 @@
 # runs in git that are missing here (data/sync.sh pull --all; dropped runs skipped). A failure does not undo the merge.
 cd "$(git rev-parse --show-toplevel)"
 for r in $(git diff --diff-filter=D --name-only ORIG_HEAD HEAD -- 'data/*/run.yaml' 2>/dev/null | cut -d/ -f2); do
-  rm -rf -- "data/$r" "results/$r" && echo "[sync] $r: deleted in git, local files removed"
+  rm -rf -- "data/$r" && echo "[sync] $r: deleted in git, local files removed"
 done
 data/sync.sh pull --all || echo "[sync] download failed, retry: data/sync.sh pull --all" >&2

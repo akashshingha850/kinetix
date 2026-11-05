@@ -11,6 +11,7 @@
 #          --roi              stop-and-shoot NBV, ~25 min wall (default)
 #          --method M         any kinetix method name        --seed N   (default 0)
 #          --scene FILE       (default kinetix/scenes/warehouse_room.yaml)
+#          --experiment NAME  config overlay acquisition/config/experiments/NAME.yaml (repeatable; compare: python -m acquisition.compare)
 #          --gui              sim with a window instead of headless
 # e.g. `room_scan.sh fly --tour`, `room_scan.sh --tour --seed 3`. Env METHOD, SEED, SCENE, GUI=1 still set the defaults.
 # Env: BISG_DIR (default: the bisg_isaac checkout next to this repo, else ~/Documents/bisg_isaac).
@@ -26,7 +27,7 @@ GUI="${GUI:-0}"
 say(){ printf '\033[1;36m[room_scan]\033[0m %s\n' "$*"; }
 die(){ printf '\033[1;31m[room_scan] %s\033[0m\n' "$*" >&2; exit 1; }
 
-CMD=all; RUN=
+CMD=all; RUN=; XCFG=()
 while (($#)); do
   case "$1" in
     all|sim|fly|sfm|stop) CMD="$1";;
@@ -35,9 +36,11 @@ while (($#)); do
     --method) METHOD="${2:?--method needs a value}"; shift;;
     --seed) SEED="${2:?--seed needs a value}"; shift;;
     --scene) SCENE="${2:?--scene needs a value}"; shift;;
+    --experiment) f="acquisition/config/experiments/${2:?--experiment needs a name}.yaml"; [[ -f $KX/$f ]] || die "no $f"
+                  XCFG+=(--config "$f"); shift;;
     --run) RUN="${2:?--run needs a value}"; shift;;
     --gui) GUI=1;;
-    -h|--help|help) sed -n 2,16p "$0"; exit 0;;
+    -h|--help|help) sed -n 2,17p "$0"; exit 0;;
     -*) die "unknown option $1 (see --help)";;
     *) RUN="$1";;   # sfm RUN
   esac
@@ -73,7 +76,7 @@ sim_up(){
 
 fly(){
   say "flying the capture: scene=$SCENE method=$METHOD seed=$SEED (tour ~5 min, roi_coverage ~25 min wall)"
-  kx python3 -m kinetix run --scene "$SCENE" --method "$METHOD" --rig mavros --seed "$SEED"
+  kx python3 -m kinetix run --scene "$SCENE" --method "$METHOD" --rig mavros --seed "$SEED" "${XCFG[@]}"
   say "run: $(latest_run)"
 }
 
@@ -83,7 +86,7 @@ sfm(){
   [[ "$run" = /* ]] || run="$KX/$run"
   say "reconstructing $(basename "$run")"
   kx python3 -m kinetix sfm "data/$(basename "$run")"
-  say "result: $KX/results/$(basename "$run")/sfm/  (points.ply, metrics.json)"
+  say "result: $KX/data/$(basename "$run")/sfm/  (points.ply, metrics.json)"
 }
 
 case "$CMD" in

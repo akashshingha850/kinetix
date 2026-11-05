@@ -1,299 +1,332 @@
-# Graph Report - kinetix  (2026-10-20)
+# Graph Report - kinetix  (2026-11-02)
 
 ## Corpus Check
-- 60 files · ~59,249 words
+- 117 files · ~112,088 words
 - Verdict: corpus is large enough that graph structure adds value.
-- Unclassified: 5 file(s) not represented in the graph (top: (none) 2, .example 1, .xml 1)
 
 ## Summary
-- 1106 nodes · 3003 edges · 51 communities (45 shown, 6 thin omitted)
-- Extraction: 70% EXTRACTED · 30% INFERRED · 0% AMBIGUOUS · INFERRED: 910 edges (avg confidence: 0.88)
+- 1123 nodes · 2914 edges · 72 communities (48 shown, 24 thin omitted)
+- Extraction: 92% EXTRACTED · 8% INFERRED · 0% AMBIGUOUS · INFERRED: 238 edges (avg confidence: 0.89)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
-- MavrosRig & Rig Config
-- Room Capture & SfM Pipeline
-- Benchmarks, Venues & Scene Licences
-- Planner Budget & Coverage Config
-- Constraints & Layered Config
-- Aerial Active Reconstruction Literature
-- Radiance-Field NBV Literature
-- Orbit Baseline & Demo Scenes
-- Tour Method (ADR-K12)
+- Room Tour Planner
+- SfM and Bench Harness
+- Scene and Bench Configs
+- Rig Adapters and Drift
+- Run Comparison Reports
+- Config and Session Loop
+- Coverage Model
+- Metrics and Scene Build
+- NBV Bench and Explore
+- Core Types and Validation
+- MAVROS Rig
+- Exploration Planner
+- Explore Tests
+- Occupancy Map
+- Rig Liveness Tests
+- Novelty Search Report
+- Validation Architecture V0-V8
+- Render Server
+- Tiers and Component Protocols
+- Room Fit
+- Geometry and Scorers
+- Roadmap and Testing
+- Room Tour ADRs
+- Project Docs Hub
+- Dry Rig Motion
+- Kinetix CLI
+- Related Work and Mono vs Stereo
+- Aerial Reconstruction Notes
+- Baselines and Pool Format
 - Foundation Models in Planning
-- Geometry & Constraints Code
-- CLI, Coverage Code & Room Tests
-- Module Map & Config Code
-- Rig Protocol & Frame Types
-- Phases, Todo & Scope Rules
-- bisg Platform & MAVROS Rig
-- Related Work & ActMVS
-- ActiveGS & Splatting Baselines
-- NBV Scorers & Open Questions
-- Contribution C3: N@q Metric
-- Architecture & Closed Loop
-- Mono vs Stereo Study
-- Baseline Families (FisherRF)
-- Claude Instructions & Data Rules
-- Contribution C1: SfM-Anchored NBV
-- Contribution C2: Depth Study
-- Environment Setup & check_env
-- Image-Efficiency Literature
-- Publication Plan & Benchmark Protocol
-- Workspace Sampler & Core Types
-- Execution Tiers & View Pools
-- Sensing Modes (ADR-K07)
-- Mono vs Stereo Decisions
-- Learned Reconstructability Papers
-- Coverage Path Planning Papers
-- Kinetix Idea & Applications
-- VGGT & Feed-Forward 3D
-- Testing & ReconState
-- Stereo Depth Source (Q6)
-- Run Log Format
-- Offline Pipeline & Densify
-- Box Geometry
-- NeRF & Gaussian Splatting Papers
-- Coverage Tests & Look-At
-- Dependency Rule
-- Package Root
+- Tour Bench
+- C1 Contribution and Anchored Depth
+- Densify and Offline Pipeline
+- NBV Scorer Family
+- Run Directory and Area Split
+- Sensing Modes
+- Radiance Field NBV
+- Room Scan Script
+- Exploration Tests
+- Depth and Snapshot Streams
+- Room Photogrammetry Review
+- Proxy Validation (V3)
+- ZED Depth Study
+- Benchmarks and Venues
+- Work Plan Phases
+- Run Logging
+- Import Boundary Test
+- Setup and Environment
+- Cube Mesh Test
+- Data Prune Workflow
+- Render Server Script
+- ZED Stream Budget
+- Known Issues
+- Runtime Placement
+- Metrics Guard
+- Timeline and Venues
+- Post-checkout Hook
+- Post-merge Hook
+- Pre-push Hook
+- ROS Executors Design
+- ROS at the Edges
+- Zero-copy Upgrade
+- Bench Matrix Dir
+- Kinetix CLI Commands
+- kinetix namespace
 
 ## God Nodes (most connected - your core abstractions)
-1. `MavrosRig` - 53 edges
-2. `CoverageState` - 41 edges
-3. `Pose` - 38 edges
-4. `run_sfm()` - 35 edges
-5. `run_session()` - 28 edges
-6. `Candidate` - 26 edges
-7. `BoxConstraints` - 25 edges
-8. `camera_pose()` - 24 edges
-9. `Intrinsics` - 23 edges
-10. `Field splits into four families: offline view selection in trained NeRF/3DGS; online RGB-D active mapping; learned object NBV policies; classic geometry-prediction NBV` - 23 edges
+1. `Pose` - 72 edges
+2. `Intrinsics` - 64 edges
+3. `CoverageState` - 57 edges
+4. `camera_pose()` - 53 edges
+5. `load_scene()` - 49 edges
+6. `OccupancyMap` - 48 edges
+7. `MavrosRig` - 43 edges
+8. `Scene` - 43 edges
+9. `load_config()` - 40 edges
+10. `Box` - 38 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `rig.speed_mps and dry_noise_m: dry-rig time estimate and noise` --references--> `DryRig`  [INFERRED]
-  config/default.yaml → src/kinetix/rig/dry.py
-- `standby: camera 1.2 m above spawn` --references--> `MavrosRig`  [INFERRED]
-  config/scenes/warehouse_room.yaml → src/kinetix/rig/mavros.py
-- `run command: python3 -m kinetix run --scene ... --rig mavros` --conceptually_related_to--> `kx()`  [INFERRED]
-  docker/compose.yaml → scripts/room_scan.sh
-- `Before a sim run (stop lc-chat, bisg check/smoke)` --conceptually_related_to--> `sim_up()`  [INFERRED]
-  docs/setup.md → scripts/room_scan.sh
-- `K1 Core + T0 skeleton` --references--> `cmd_run()`  [INFERRED]
-  docs/roadmap.md → src/kinetix/cli.py
+- `method: depth_coverage` --semantically_similar_to--> `depth_coverage depth_surface planning`  [INFERRED] [semantically similar]
+  config/bench/baselines.yaml → acquisition/config/object.yaml
+- `method: volumetric_ig` --semantically_similar_to--> `volumetric_ig baseline (occupancy map)`  [INFERRED] [semantically similar]
+  config/bench/baselines.yaml → acquisition/config/object.yaml
+- `method: orbit` --semantically_similar_to--> `orbit baseline`  [INFERRED] [semantically similar]
+  config/bench/baselines.yaml → acquisition/config/object.yaml
+- `OccupancyMap` --uses--> `Intrinsics`  [INFERRED]
+  acquisition/mapping/depthmap.py → kinetix/types.py
+- `OccupancyMap` --uses--> `Pose`  [INFERRED]
+  acquisition/mapping/depthmap.py → kinetix/types.py
 
 ## Import Cycles
 - None detected.
 
 ## Hyperedges (group relationships)
-- **Rig adapters across execution tiers** — docs_architecture_pool_rig, docs_architecture_isaac_render_rig, docs_architecture_mavros_rig, src_kinetix_rig_base_rig [EXTRACTED 1.00]
-- **Room tour pipeline (plan, order, fly, reconstruct)** — docs_architecture_tour_viewpoints, docs_architecture_tour_order, docs_architecture_tour_fly, docs_architecture_tour_offline_sfm, src_kinetix_planner_tour [EXTRACTED 1.00]
-- **C1 claim, anchoring ablation and K3 go/no-go** — docs_publication_plan_c1, docs_benchmark_anchoring_ablation, docs_roadmap_k3, docs_publication_plan_c1_gonogo, docs_decisions_adr_k08 [INFERRED 0.85]
-- **Tour method: viewpoint set cover + TSP order + continuous keyframe capture** — config_room_tour, config_room_tour_cover, config_room_tour_cost, config_room_keyframes, src_kinetix_planner_tour_select_viewpoints, src_kinetix_planner_tour_order_tour, src_kinetix_planner_tour_sample_path [EXTRACTED 0.95]
-- **Baseline matrix reviewers expect** — docs_research_reports_kinetix_novelty_search_fixed_patterns, docs_research_reports_kinetix_novelty_search_fvs, docs_research_reports_kinetix_novelty_search_volumetric_ig, docs_research_reports_kinetix_novelty_search_fisherrf, docs_research_reports_kinetix_novelty_search_learned_planner [EXTRACTED 0.95]
-- **Sensing 2x2 design: plan_depth x recon_input presets answering RQ2/H1** — docs_research_mono_vs_stereo_plan_depth, docs_research_mono_vs_stereo_recon_input, docs_research_mono_vs_stereo_presets, docs_research_mono_vs_stereo_h1, docs_research_mono_vs_stereo_rq2 [EXTRACTED 0.95]
+- **Room tour experiment variants** — acquisition_config_experiments_close, acquisition_config_experiments_dense, acquisition_config_experiments_fine_grid, acquisition_config_experiments_slow, acquisition_config_experiments_sparse, acquisition_config_experiments_traditional [EXTRACTED 1.00]
+- **Benchmark chain baselines -> dense -> oracle** — config_bench_baselines, config_bench_dense, config_bench_oracle, config_bench_tiers_t1 [EXTRACTED 1.00]
+- **Office object scan scenes** — sim_scenes_office_buddha, sim_scenes_office_monster, sim_scenes_office_chair, sim_scenes_office_world [EXTRACTED 1.00]
+- **C1 SfM-anchored monocular NBV components** — docs_methodology_m3_anchored_depth, docs_acquisition_architecture_depth_frontier_scorer, docs_acquisition_architecture_sfm_uncertainty_scorer, docs_acquisition_architecture_combo_scorer, docs_paper_publication_plan_c1 [EXTRACTED 1.00]
+- **Four-tier realism protocol T0-T3** — docs_architecture_t0_pool_replay, docs_architecture_t1_render, docs_architecture_t2_sim_flight, docs_architecture_t3_real, docs_paper_benchmark_tier_transfer [EXTRACTED 1.00]
+- **Validation V0-V8 ladder gating T2 flights** — docs_methodology_v0, docs_methodology_v1, docs_methodology_v3, docs_methodology_v4, docs_methodology_v7, docs_methodology_v8, docs_methodology_flight_gate [EXTRACTED 1.00]
+- **Offline reconstruction pipeline stages** — docs_reconstruction_pipeline_sfm, docs_reconstruction_pipeline_align, docs_reconstruction_pipeline_densify, docs_reconstruction_pipeline_evaluate [EXTRACTED 1.00]
+- **Kinetix roadmap phases K0-K6** — docs_roadmap_k0, docs_roadmap_k1, docs_roadmap_k2, docs_roadmap_k3, docs_roadmap_k4, docs_roadmap_k5, docs_roadmap_k6 [EXTRACTED 1.00]
+- **Execution tiers T0-T3 test levels** — docs_testing_t0, docs_testing_t1, docs_testing_t2, docs_testing_t3 [EXTRACTED 1.00]
 
-## Communities (51 total, 6 thin omitted)
+## Communities (72 total, 24 thin omitted)
 
-### Community 0 - "MavrosRig & Rig Config"
+### Community 0 - "Room Tour Planner"
 Cohesion: 0.05
-Nodes (52): Kinetix defaults (config/default.yaml), rig.auto_world_to_map: measure map-world offset on the ground, rig.bag: MCAP flight recording profile, camera: nominal ZED Mini 720p intrinsics and mount, rig.cruise_mps: carrot speed (VIO-safe), rig.speed_mps and dry_noise_m: dry-rig time estimate and noise, rig.max_lead_m: path clock pauses when setpoint lags, camera.mount_pitch_deg: level forward-looking mount (+44 more)
+Nodes (75): BoxConstraints, ndarray, Feasibility (acquisition/architecture.md §8): inside the workspace, at an…, apply_shift(), The session entry point (acquisition/architecture.md §5): picks the method's…, depth_surface(), orbit_order(), ndarray (+67 more)
 
-### Community 1 - "Room Capture & SfM Pipeline"
+### Community 1 - "SfM and Bench Harness"
+Cohesion: 0.05
+Nodes (73): anchor(), MonoDepth, ndarray, Monocular depth for planning (methodology.md M3, sensing.plan_depth `mono` /…, (H, W) float32 at the image's size: relative inverse depth (RELATIVE) or metres…, (s, t, inliers) with 1/z ≈ s·rel[v, u] + t over the anchors (pixel u, v; depth…, Anchored metric depth (m); NaN where s·rel + t gives no positive depth below…, to_depth() (+65 more)
+
+### Community 2 - "Scene and Bench Configs"
 Cohesion: 0.06
-Nodes (63): Rooms: method tour + kinetix sfm, MCAP rosbag per flight, Metric frame via Sim3 alignment to rig poses, Scene kinds: object vs room, recon.pose_source (sfm | prior | gt) ablation axis, Room capture: method tour, Scene file constraints (roi, workspace, no_fly, standoff, altitude), Tour step 3: continuous flight with keyframes (fly_path), Tour step 4: known-pose offline SfM (+55 more)
+Nodes (62): common.yaml (shared acquisition settings), Camera model (ZED Mini 720p), Coverage model (GT-free ROI proxy), Planner defaults (timeouts, ROI clearance), Rig settings (mavros/dry rig, cruise, tolerances), Closer views experiment (range_factor 1.5), Dense overlap experiment (0.25 m / 4 deg keyframes), Fine grid experiment (1.5 m spacing, 0.7 m layers) (+54 more)
 
-### Community 2 - "Benchmarks, Venues & Scene Licences"
+### Community 3 - "Rig Adapters and Drift"
 Cohesion: 0.07
-Nodes (56): source: Isaac Simple_Warehouse asset, not redistributable, Bag of Views (RA-L 2023) with the View Planning Toolbox, Experimental contribution (iii): four-tier realism protocol (replay, render, PX4 SITL, real flight), GenNBV (CVPR 2024): depth-based RL NBV in Isaac Gym, sim only, One learned planner: ma_scvp preferred, gennbv as drone-flavoured alternative, MA-SCVP (T-RO 2025): public learned object-NBV baseline of the Bonn group, ObjView-Bench argues deployment constraints change method rankings: Kinetix tiered-protocol argument, but for a tabletop arm; code only on acceptance, Open: tiered photoreal-replay -> render -> PX4 SITL -> real-flight protocol measuring rank shifts (+48 more)
+Nodes (16): depth_points(), DriftTracker, best_around(), ndarray, Map-frame points (n, 3) of the valid near returns of a depth image (same…, Closeness-to-occupied field over the box around the occupied voxels, and that…, Mean field value of `pts` shifted by each offset in T (m, 3)., Register one frame taken at `ekf_pose` against the map; moves self.t when the… (+8 more)
 
-### Community 3 - "Planner Budget & Coverage Config"
-Cohesion: 0.06
-Nodes (44): planner.budget: image budget (20), coverage: GT-free ROI-proxy coverage model, planner.coverage_target: stop at 95 % triangulated, coverage.depth_range_m: usable depth window, coverage.max_incidence_deg: seen only below this angle to normal, coverage.max_views per proxy point, coverage.novel_deg: extra rays must be novel, planner: NBV loop parameters (+36 more)
-
-### Community 4 - "Constraints & Layered Config"
+### Community 4 - "Run Comparison Reports"
 Cohesion: 0.07
-Nodes (47): planner.clearance_m and roi_clearance_m: no-fly and ROI keep-out, Layered config: default < --config files < key=value overrides, planner.rings: ring-stack candidates around ROI vertical axis, coverage.spacing_m: surface sample spacing on ROI box, planner.clearance_m 0.8 around no-fly boxes, planner.grid: GridSampler candidates filling the workspace, Room layer (ADR-K11): applied after default.yaml for kind: room scenes, coverage.spacing_m 0.5: coarser room surface sampling (~8.5 k points) (+39 more)
+Nodes (29): config_diff(), _flat(), _get(), load_run(), main(), Path, Compare flights by their SfM result: which acquisition setting gave the better…, _run() (+21 more)
 
-### Community 5 - "Aerial Active Reconstruction Literature"
-Cohesion: 0.09
-Nodes (48): COLMAP / Structure-from-motion revisited (Schonberger & Frahm, CVPR 2016) [1], FlyCo: foundation-model drones for 3D structure scanning [36], OpenDroneMap vs Metashape accuracy benchmark (Kostrzewa et al.) [49], Kriegel et al.: next-best-scan planning with robotic arms [32], On-the-fly feedback SfM (Lou et al.) [3], Mostegel et al. 2016: UAV acquisition with MVS confidence prediction [2], OpenDroneMap / WebODM [4], OpenSfM [5] (+40 more)
+### Community 5 - "Config and Session Loop"
+Cohesion: 0.14
+Nodes (36): run_session(), load_rig(), The K2 baselines on the dry rig (fvs, volumetric_ig, orbit_rings), bench seeds,…, session(), test_fvs_spreads_the_views(), test_orbit_rings_prefixes_are_spread(), test_pool_rig_replays_a_pool(), test_seeds_change_the_first_view() (+28 more)
 
-### Community 6 - "Radiance-Field NBV Literature"
-Cohesion: 0.12
-Nodes (44): NARUTO (arXiv 2402.18771): neural active reconstruction, RGB-D, Radiance-field / 3DGS-based active view selection and NBV (2022-2026): novelty check for Kinetix, Active Neural Mapping (ICCV 2023): neural variability, RGB-D, ActiveGS (RA-L 2025): hybrid 3DGS + voxel map, RGB-D, real UAV, ActiveNeRF (ECCV 2022): radiance variance, offline candidate pool, ActiveSplat (RA-L 2025): scene-level active Gaussian splatting, AG-SLAM (arXiv 2410.17422): active 3DGS SLAM with Fisher information, Auto3R (arXiv 2512.04528): robot-arm real deployment (+36 more)
-
-### Community 7 - "Orbit Baseline & Demo Scenes"
-Cohesion: 0.08
-Nodes (39): planner.orbit: orbit baseline ring, Scene simple_room_blocks: first demo object scene in Isaac Simple Room, Scene warehouse_room: whole-room photogrammetry of the Isaac Simple_Warehouse (ADR-K11), service kinetix: image kinetix:jazzy built from repo Dockerfile, random scorer, Component registry by name, Sampler protocol, Scorer protocol (uses_gt flag) (+31 more)
-
-### Community 8 - "Tour Method (ADR-K12)"
+### Community 6 - "Coverage Model"
 Cohesion: 0.10
-Nodes (38): keyframe_step_m 0.4 / 6 deg: sequential overlap for SfM, planner.tour (ADR-K12): viewpoints + TSP + continuous capture, tour.yaw_cost_m / path_step / keyframe_step: TSP turn cost and carrot path resolution, tour.coverage_target 0.8 set cover; path fills the rest (dry 0.91), select: gain minus lambda times travel cost, camera_yaw(), Heading of the optical axis projected on the ground plane., wrap() (+30 more)
+Nodes (23): test_room_surface_normals_point_inward_and_floor_under_obstacle_is_dropped(), box_surface(), CoverageState, MeshOcclusion, ndarray, Self-occlusion test against a mesh (the GT mesh: oracle only): a depth image…, (h, w) optical depth (m, inf = no hit) at 1/scale of K's resolution., room_surface() (+15 more)
 
-### Community 9 - "Foundation Models in Planning"
+### Community 7 - "Metrics and Scene Build"
+Cohesion: 0.08
+Nodes (36): io, open3d, ndarray, Geometric metrics of a reconstruction against GT (paper/benchmark.md §3).…, Distance (m) from each point to the triangle mesh (V, F)., Distance (m) from each query point to its nearest neighbour in `points`., accuracy = mean recon -> GT mesh, completeness = mean GT observable points ->…, score() (+28 more)
+
+### Community 8 - "NBV Bench and Explore"
+Cohesion: 0.10
+Nodes (37): acquisition_planner, _cands(), explore_once(), wrapped(), go(), is_frontier(), main(), make_oracle() (+29 more)
+
+### Community 9 - "Core Types and Validation"
 Cohesion: 0.12
-Nodes (37): AREA3D (CVPR 2026): active agent on feed-forward 3D perception, Foundation depth / pointmap models inside active reconstruction, NBV and exploration (2023-2026): novelty check for Kinetix, ACT-R (3DV 2026, arXiv 2505.08239): adaptive orbit + video diffusion, virtual view planning, ActMVS (ICRA 2026, arXiv 2606.01367): monocular MVS aerial scene reconstruction, Replica, code TrickyGo/ActMVS, AIM-SLAM (arXiv 2603.05097): keyframe choice by overlap and information gain, AREA3D (CVPR 2026, arXiv 2512.05131): active agent on feed-forward 3D perception + VLM guidance, Auto3R (arXiv 2512.04528): learned viewpoint uncertainty, real robot arm, Depth Anything 3 (arXiv 2511.10647): beats DA2 and VGGT; RANSAC scale-shift alignment to sparse depth (+29 more)
+Nodes (23): IsaacRenderRig (T1, interfaces.md §5): every capture is rendered by…, PoolRig (T0, interfaces.md §3): replays a pre-rendered view pool (data-…, Ray-cast depth of a box room (+ box obstacles) for the dry rig and tests: what…, surface_normal (planner/surface.py) on the dry rig: coarse orbit -> ZED-like…, test_gt_surface_thins_and_requires_the_npz(), V3 proxy validity (methodology.md §4): does the coverage a planner optimises…, copy, importlib_util (+15 more)
 
-### Community 10 - "Geometry & Constraints Code"
+### Community 10 - "MAVROS Rig"
+Cohesion: 0.14
+Nodes (8): MavrosRig, on_depth(), on_img(), settled(), EKF2 says the drone moves faster than it can: the estimate has diverged (sim:…, Raise RigError(aborted) when the rig can no longer fly: the stream thread died,…, RigError, RuntimeError
+
+### Community 11 - "Exploration Planner"
+Cohesion: 0.12
+Nodes (27): The scene's room, workspace, obstacles and altitude band moved by d (a drift…, A scene in the scene-file format (config/scenes/*.yaml), so a fitted room can…, scene_to_dict(), translated(), face_targets(), in_frustum(), los_clear(), next_view() (+19 more)
+
+### Community 12 - "Explore Tests"
 Cohesion: 0.11
-Nodes (30): collections, 4-DoF camera pose with fixed mount pitch, Feasibility constraints (constraints.py), Constraint protocol, signal, body_from_camera(), camera_from_body(), camera_pose() (+22 more)
+Nodes (27): compare(), How far the fitted scene is from a known one (the scene file): wall offsets and…, ndarray, (H/stride, W/stride) float32 depth; NaN beyond `max_range` (no return). `K` is…, render_depth(), explore(), Exploration of an unknown room (ADR-K13): ray-cast depth, the occupancy map,…, Real ZED depth is valid almost everywhere (14400/14400 rays in the sim). A… (+19 more)
 
-### Community 11 - "CLI, Coverage Code & Room Tests"
-Cohesion: 0.12
-Nodes (25): argparse, ast, run command: python3 -m kinetix run --scene ... --rig mavros, cmd_run(), main(), `python -m kinetix run ...` (interfaces.md §6; `uv run kinetix` once…, load_scene(), Intrinsics (+17 more)
-
-### Community 12 - "Module Map & Config Code"
+### Community 13 - "Occupancy Map"
 Cohesion: 0.13
-Nodes (20): copy, dataclasses, Module map (src/kinetix layout), K1 Core + T0 skeleton, json, numpy, pathlib, platform (+12 more)
+Nodes (12): OccupancyMap, ndarray, Free voxels with an unknown face neighbour: the edge of what the drone has seen…, Box dilation by rxy voxels in x and y, rz in z (separable)., Dilation radii in voxels. Centre-to-centre distances undercount the gap to an…, Voxels where the drone may stop: free, and no occupied or unknown voxel within…, Voxels the drone may pass through: known free and clear of occupied space.…, Integer voxel indices (n, 3) of map points and the mask of those inside the… (+4 more)
 
-### Community 13 - "Rig Protocol & Frame Types"
-Cohesion: 0.12
-Nodes (12): Protocol, Frame, Pose, covis_pairs(), Pairs for a continuous capture (method `tour`): each frame with its `window`…, (image_i, image_j, shared) for frame pairs that co-observe >= min_shared…, video_pairs(), Rig protocol (interfaces.md §3). The planner imports only this module; adapters… (+4 more)
+### Community 14 - "Rig Liveness Tests"
+Cohesion: 0.11
+Nodes (21): _diverged_rig(), A dead rig must abort the session instead of timing out forever (2026-10-22…, A rig whose EKF2 position jumped `speed_jump_m` within the last half second…, A yaw step made PX4 turn at 60 deg/s and the ZED's pose lagged 4-5 deg…, Every move times out, like a rig whose clock froze., A MavrosRig shell without ROS: only what _check_alive / _stream_loop touch., _rig(), _StuckRig (+13 more)
 
-### Community 14 - "Phases, Todo & Scope Rules"
-Cohesion: 0.13
-Nodes (24): Build phase by phase (K0-K6), do not widen scope, Q4 ground truth for real objects, Stop-and-shoot capture, ADR-K06 Stop-and-shoot capture in v1, RigError kinds (unreachable, timeout, no_image, aborted), Publication plan, C1 go/no-go at G2, C5 Real-flight evaluation and release (+16 more)
-
-### Community 15 - "bisg Platform & MAVROS Rig"
-Cohesion: 0.18
-Nodes (23): bisg_isaac is the platform: use its contract, never copy code, MavrosRig (T2/T3 flight rig), Q3 scene mount into bisg sim, System context: bisg_isaac platform, ADR-K01 Reuse bisg_isaac through its interface contract only, ADR-K09 ROS 2 pipeline: ROS at the edges, goto action + snapshot service (proposed), capture_at settle sequence, Rig protocol and RigCaps (+15 more)
-
-### Community 16 - "Related Work & ActMVS"
-Cohesion: 0.17
-Nodes (23): Related Work, ActMVS: monocular active scene reconstruction [35], ActMVS: replacing MVS depth with single-image depth raises Chamfer ~2.4 cm -> ~46 cm, FisherRF: RGB-only view selection via 3DGS Fisher information [48], FrontierNet: frontiers from posed RGB + monocular metric depth [39], Gap 1: scale from the reconstruction itself: anchor relative depth to online SfM, no depth sensor or metric-depth model (C1), Gap 2: what depth is for: one fixed NBV planner swapped between monocular, small-baseline stereo and RGB-D, 2x2 design (C2), Gap 3: images-to-quality: N@q against a dense capture of the same object, geometric F-score (C3) (+15 more)
-
-### Community 17 - "ActiveGS & Splatting Baselines"
+### Community 15 - "Novelty Search Report"
 Cohesion: 0.14
-Nodes (22): ActiveGS (2025), ActiveGS (RA-L 2025): RGB-D active scene reconstruction with 3DGS, ActMVS (ICRA 2026): monocular active scene reconstruction, view factor graph, Bonn group (SCVP, MA-SCVP, ObjView-Bench, DM-OSVP++, ActiveGS) is the likely reviewer pool: frame Kinetix as the aerial, photoreal, monocular-SfM complement, First monocular active (aerial) reconstruction: TAKEN for scenes, First monocular depth foundation model in NBV/exploration: TAKEN, RGB-only object NBV on a real drone: TAKEN (weakly), qualitative, First RGB-only object NBV: TAKEN (+14 more)
+Nodes (23): Statistics plan (bootstrap CI, Wilcoxon, Holm, Kendall), V1 evaluation fidelity, N@q images-to-quality metric, ActMVS, Missing baselines: FVS, volumetric IG, FisherRF, learned planner, FisherRF, Four-tier realism protocol (replay, render, SITL, real flight), FrontierNet (+15 more)
 
-### Community 18 - "NBV Scorers & Open Questions"
+### Community 16 - "Validation Architecture V0-V8"
+Cohesion: 0.10
+Nodes (23): 4-DoF camera pose with fixed mount pitch, coverage_oracle scorer (GT upper bound), Indoor feasibility constraints (workspace, no-fly, standoff, straight segment), K2 oracle check fails (volumetric_ig best), Validation to the flight gate task, Open question Q1: ZED mount pitch, Flight gate before PX4/ROS T2 work, k_min view coverage and occlusion-aware visibility (+15 more)
+
+### Community 17 - "Render Server"
+Cohesion: 0.10
+Nodes (18): carb, geometry_msgs_msg, isaacsim, isaacsim_core_experimental_utils_app, omni_replicator_core, omni_timeline, omni_usd, pil (+10 more)
+
+### Community 18 - "Tiers and Component Protocols"
+Cohesion: 0.10
+Nodes (21): Pose convention T_map_cam (ENU map, OpenCV optical), Baselines are configurations of the same loop, Sim3 alignment of SfM to rig poses (metric map frame), pose_source ablation axis (sfm, prior, gt), ReconState online reconstruction (pycolmap), select = gain minus lambda times travel cost, Session loop run_session, RosRig unified client for T1-T3 (+13 more)
+
+### Community 19 - "Room Fit"
 Cohesion: 0.16
-Nodes (21): NBV scorers table, Open questions Q1-Q6, Q1 ZED mount pitch, Q2 object set, Q5 drone pose as a prior in the mono claim, combo scorer (Kinetix method), coverage_oracle scorer (GT upper bound), depth_frontier scorer (+13 more)
+Nodes (19): components(), _extent(), face_coverage(), face_openings(), fit_scene(), _plane(), ndarray, Fit a room `Scene` (room box, workspace, obstacle boxes) to an OccupancyMap:… (+11 more)
 
-### Community 19 - "Contribution C3: N@q Metric"
-Cohesion: 0.16
-Nodes (21): C3: N@q images-to-quality metric normalised to a dense capture, Kinetix wins on decomposition, not on savings, C3: N@q images-to-quality metric alongside Chamfer, F-score and coverage AUC, C4: four-tier evaluation protocol quantifying rank and saving shifts as realism increases, C5: real-flight evaluation on PX4/Jetson with scanned GT; released view pools, twins, code and baselines, Five claims remain open (absence-of-evidence findings), Conclusion: a measurement paper with a principled monocular method attached, Recommended contribution list C1-C5 for an RA-L submission (+13 more)
-
-### Community 20 - "Architecture & Closed Loop"
-Cohesion: 0.13
-Nodes (20): Kinetix architecture, Baselines are configurations of the same loop, Closed NBV capture loop, Design goals (one planner, minimal, modular, measurable), Session loop (run_session), Reporting rules, Seeds (3 for K2-K3, 5 for paper), Benchmark directory (matrix.yaml, results.csv, report.md) (+12 more)
-
-### Community 21 - "Mono vs Stereo Study"
-Cohesion: 0.16
-Nodes (20): ZED Mini stereo camera (63 mm baseline) as comparison sensor, Study: monocular vs stereo in Kinetix, ActMVS (Pu, Han, Lian; ICRA 2026): closest monocular competitor, Depth study: ~50 views, abs-rel / RMSE / % within 1 cm binned by distance and surface; noise model sigma(z) per source; reuses bisg zed_depth_box approach, FlyCo (arXiv 2601.07558): outdoor foundation-model drone scanning, FoundationStereo (CVPR 2025): zero-shot stereo, offline stereo depth source for T0 pools, H1: stereo depth helps planning much more than final accuracy, which multi-view SfM/MVS dominates, Kotlyar close-range study (arXiv 1903.09169): ZED denser than active stereo at 0.6 m but ~2x RMSE (+12 more)
-
-### Community 22 - "Baseline Families (FisherRF)"
-Cohesion: 0.13
-Nodes (19): FisherRF (ECCV 2024), PUN: half the views [45], Four baseline families reviewers expect; current matrix covers only fixed patterns, 50-80 % fewer images than fixed patterns: TAKEN, Gap: none of the surveyed papers evaluates the selected image set through unmodified COLMAP SfM->MVS against a GT mesh, Delmerico et al.: volumetric information-gain planner family and open ROS framework, FisherRF (ECCV 2024): RGB-only view selection by Fisher information over a candidate pool, Farthest-view sampling baseline (fvs): cheap and strong, 70 views vs 150 random (+11 more)
-
-### Community 23 - "Claude Instructions & Data Rules"
-Cohesion: 0.14
-Nodes (18): Kinetix instructions for Claude Code, Large data in $KINETIX_DATA, only tests/fixtures in git, Change interfaces.md first, then the code, Pose convention T_map_cam ENU OpenCV, convert in core.geometry, uv Python env, no host ROS, ROS in kinetix image, Workstation B: check nvidia-smi, stop lc-chat, Configuration layering, GPU budget on workstation B (+10 more)
-
-### Community 24 - "Contribution C1: SfM-Anchored NBV"
-Cohesion: 0.17
-Nodes (18): C1: SfM-anchored monocular NBV (DA-V2 scale-anchored online to SfM, TSDF frontier + SfM uncertainty), Depth Anything V2 relative-depth foundation model, SfM-uncertainty score, TSDF frontier score from scale-anchored depth, Depth Anything: zero-shot depth from 60M+ images [30], Murre: SfM-guided monocular depth fused into TSDF [40], Kinetix SfM scale fit answers the unreliable-depth argument: paper must show anchoring makes the prior usable, C1: monocular NBV anchoring a relative-depth foundation model to SfM scale, TSDF frontier + SfM uncertainty, no depth sensor or metric model (+10 more)
-
-### Community 25 - "Contribution C2: Depth Study"
-Cohesion: 0.18
-Nodes (18): C2: what is depth for? first controlled mono-vs-stereo (ZED Mini, 63 mm) study in one planner, 2x2 design, Maboudi et al.: review of UAV viewpoint and path planning [12], C2: first controlled study of mono vs small-baseline stereo within one NBV planner (2x2 presets mono/stereo_plan/stereo_full/oracle_depth), Experimental contribution (i): same-planner mono vs 63 mm stereo, depth for planning vs for reconstruction (2x2), H1 prediction: stereo helps planning far more than final accuracy (falsifiable), Next-Best Stereo (BMVC 2016): 3.8-4.4 % of Middlebury views, Open: same-planner mono vs real small-baseline stereo, 2x2 of plan-depth x recon-input, Plan3D (Hepp et al., TOG 2018): GT-depth vs SfM/MVS reconstruction split (+10 more)
-
-### Community 26 - "Environment Setup & check_env"
-Cohesion: 0.12
-Nodes (7): K0 Foundations, Python environment (uv sync, check_env, uv.lock pins), kinetix, Quick start (uv sync, check_env), Verify the Kinetix Python environment: each library is imported *and* exercised…, shutil, sys
-
-### Community 27 - "Image-Efficiency Literature"
-Cohesion: 0.23
-Nodes (16): Mono vs stereo vs RGB-D in active reconstruction, and image-set minimisation for SfM/MVS (Kinetix novelty check), ActMVS (arXiv 2606.01367): compared with RGB-D ActiveGS and NARUTO, Baseline choice inflates or deflates the reduction: report against the strongest fixed pattern (dense multi-ring orbit) and a strong adaptive baseline, ActMVS "w/o MVS" is a controlled depth-source ablation inside one planner (Chamfer 2.4 -> 46 cm), but not stereo vs RGB-D, Mono-vs-stereo novelty is experimental-design, not algorithmic; Kinetix targets one object with COLMAP SfM->MVS/3DGS output, Recommended framing: lead with the modality comparison and the depth decomposition; N@q as main efficiency measure; savings as consistent with prior reports, Open: controlled mono vs stereo (ZED Mini 63 mm) study, planning-vs-reconstruction depth 2x2, N@q, indoor single-object small-drone COLMAP + 3DGS output, Knapitsch et al. 2017: F-score@tau (Tanks and Temples) (+8 more)
-
-### Community 28 - "Publication Plan & Benchmark Protocol"
-Cohesion: 0.26
-Nodes (15): Paper claims C1-C5; never call image saving a novelty, Benchmark protocol, Dense reference F_ref, N@q images-to-quality headline metric, N@q sensitivity to reference density (120/240/360), Comparability with prior tables (coverage AUC, K=5/30), Tier transfer metric (Kendall tau, delta N@q), ADR-K08 Measurement paper positioning, stronger baselines (+7 more)
-
-### Community 29 - "Workspace Sampler & Core Types"
-Cohesion: 0.25
-Nodes (11): workspace: camera >= 1.5 m from walls, east of racks, 4 m tall, Core types (Pose, Intrinsics, Frame, Candidate, Box, Scene), ReconState API, Candidate, RigCaps, Scene, grid_poses(), GridSampler (+3 more)
-
-### Community 30 - "Execution Tiers & View Pools"
-Cohesion: 0.21
-Nodes (15): Execution tiers T0-T3, IsaacRenderRig (T1 render rig), PoolRig (T0 replay rig), View pool (T0), Pools rings:4x60 and tammes:128, reachable flag and test split, View pool directory (pool.yaml, views.jsonl, images, right, depth, zed), views.jsonl (one view per line) (+7 more)
-
-### Community 31 - "Sensing Modes (ADR-K07)"
-Cohesion: 0.30
-Nodes (14): Sensing modes rule (mono method, stereo comparison, never ZED point cloud/odom), sensing.plan_depth axis, sensing.recon_input axis, Sensing modes: monocular method, stereo comparison, Sensing presets (mono, mono_noprior, stereo_plan, stereo_full, oracle_depth), Mono vs stereo measures (planning value, reconstruction value, gap closure), Sensing rows (mono ... oracle_depth, zed_mapping), Decisions (ADRs) (+6 more)
-
-### Community 32 - "Mono vs Stereo Decisions"
-Cohesion: 0.23
-Nodes (13): ADR-K07: decisions that follow from this study, sensing.plan_depth: depth used for planning (none, mono DA-V2 scale-fit, stereo ZED SDK or FoundationStereo, gt oracle), mono: plan_depth mono, recon left (main method), mono_noprior: does a mono depth prior help planning at all?, oracle_depth: upper bound of depth-assisted planning (gt depth), stereo_full: best the ZED can do with our planner, stereo_plan: how much does stereo help planning? (tests H1), Presets: mono (Kinetix), mono_noprior, stereo_plan, stereo_full, oracle_depth, zed_mapping baseline (+5 more)
-
-### Community 33 - "Learned Reconstructability Papers"
-Cohesion: 0.26
-Nodes (13): Liu et al. 2022: learned reconstructability, 764 vs 1,610 images at equal F-score, ActiveInitSplat (arXiv 2503.06859): GP surrogate for few-view 3DGS selection, CMVS / Furukawa 2010: redundant-image removal, unverified, DynaView (2026): Transformer reconstructability predictor + online marginal-utility updates, Most aerial planners fix budget and report quality; Kinetix fixed-quality, report-images framing is less common, Hornung, Zeng, Kobbelt CVPR 2008: image selection for improved MVS with proxy coverage, Taken: monocular online-MVS planning, large image reductions, reconstructability planners, offline image selection, classic network design, metric conventions, Liu et al. 2022: 764 images F 34.96 vs Zhou planner 1610 images F 34.55 (~53 % fewer) (+5 more)
-
-### Community 34 - "Coverage Path Planning Papers"
-Cohesion: 0.30
-Nodes (12): Bahnemann et al.: boustrophedon CPP as generalized TSP, 14 % lower path cost [7], CPP methods are open-loop, model-based and cannot react to reconstruction quality; Kinetix replaces fixed coverage geometry with uncertainty-driven NBV and needs no prior 3D model, Adaptive CPP: explore-then-exploit builds a coarse proxy first, then targets low-quality regions, Galceran & Carreras: survey on coverage path planning [6], Gap 6: CPP vs NBV: CPP plans globally but cannot react; image reduction reported as a result consistent with prior ~53-72 %, Jing et al.: multi-UAV CPP for large structures [9], Liu et al.: ~53 % fewer images at equal F-score [43], Peng & Isler: adaptive view planning for aerial 3D reconstruction, explore-then-exploit [10] (+4 more)
-
-### Community 35 - "Kinetix Idea & Applications"
-Cohesion: 0.31
-Nodes (10): Kinetix: Adaptive Dynamic Photogrammetry for Indoor Objects with Monocular Drone Imaging, Target applications: museums, warehouses, archaeology, e-commerce product modelling, C4: tiered realism protocol (view-pool replay, continuous render, PX4 SITL, real flight), C5: quantitative real flights: indoor PX4/Jetson drone, scanned GT, unmodified COLMAP -> MVS/3DGS, released pools/twins/code, Unmodified COLMAP -> MVS/3DGS output pipeline, Core problem: fixed paths need hundreds of overlapping images indoors; long flights, energy, processing; generic paths miss optimal angles, Indoor constraints (collision, standoff, fixed camera mount) are part of the method, not a contribution, Active vision framework: minimal seed images, real-time depth/uncertainty/feature analysis predicts the Next Best View, dynamic path and capture parameters (+2 more)
-
-### Community 36 - "VGGT & Feed-Forward 3D"
-Cohesion: 0.27
-Nodes (10): VGGT (CVPR 2025): feed-forward cameras, depth and points in <1 s; K5 candidate, Feed-forward 3D model + kinematic scale for NBV: TAKEN on an arm, Depth Anything 3: reported to beat DA-V2 and VGGT, Depth Pro: monocular metric depth, FrontierNet (RA-L 2025): frontiers and information gain from posed RGB + Metric3D v2, Classical planners degrade significantly with predicted depth (FrontierNet), GraspView: VGGT + kinematic-scale NBV on an arm, Metric3D v2: monocular metric depth (+2 more)
-
-### Community 37 - "Testing & ReconState"
-Cohesion: 0.39
-Nodes (9): Tests: uv run pytest (unit + t0), ReconState online reconstruction, Stereo rig reconstruction (pycolmap Rig), Testing, Component tests (t0), Test levels (unit, t0, t1, t2, t3, bench regression), t1 render integration tests, t2 flight integration tests (+1 more)
-
-### Community 38 - "Stereo Depth Source (Q6)"
-Cohesion: 0.36
-Nodes (9): Q6 stereo depth on T0 pools, Stereo depth source per tier (ZED SDK vs FoundationStereo), zed/ and zed_conf/ SDK depth + confidence maps, ADR-K10 Pools carry real ZED SDK depth rendered through the twin (proposed), DepthSource protocol, Depth confidence for stereo_zed, SDK depth on pools probe (Q6), SVO recording for T2/T3 (+1 more)
-
-### Community 39 - "Run Log Format"
-Cohesion: 0.33
-Nodes (4): frames.jsonl, _git(), Path, RunLog
-
-### Community 40 - "Offline Pipeline & Densify"
-Cohesion: 0.39
-Nodes (8): Densify backends (colmap_mvs, gsplat, tsdf_depth), Offline pipeline identical for every method, Export to COLMAP / nerfstudio / gsplat, ADR-K04 pycolmap as the only SfM backend, COLMAP format everywhere, Densifier protocol, K2 Evaluation + benchmark harness, Extras planned per phase (gsplat, colmap, FoundationStereo, kinetix image), Dense reconstruction for real completeness
-
-### Community 41 - "Box Geometry"
+### Community 20 - "Geometry and Scorers"
 Cohesion: 0.29
-Nodes (5): _box(), Box, ndarray, For segments o -> P[i] (vectorised slab test): does the segment pass through…, segments_hit_box()
+Nodes (13): OccupancyMap: a live voxel map of the room from depth images posed by the…, DriftTracker: estimate how far the EKF2 pose has drifted by registering each…, body_from_camera(), camera_from_body(), ndarray, quat_to_R(), R_to_quat(), rot_y() (+5 more)
 
-### Community 42 - "NeRF & Gaussian Splatting Papers"
-Cohesion: 0.48
-Nodes (7): 3D Gaussian Splatting [26], Instant-NGP [25], NeRF [24], pixelNeRF: few-shot view synthesis [27], Monocular 3D reconstruction: NeRF, Instant-NGP, 3DGS, sparse-view methods, depth foundation models, SparseNeRF: depth-ranking distillation for 3-5 views [28], Zero-1-to-3: diffusion novel views from a single image [29]
+### Community 21 - "Roadmap and Testing"
+Cohesion: 0.19
+Nodes (17): Paper claims C1-C5 and gates G1-G5, K0 Foundations, K1 Core, scenes, T0 replay, K2 Evaluation + benchmark harness, K4 Closed loop in sim, K5 Optimisation, K6 Real drone + paper, methodology.md stages M0-M9, validation V0-V8, flight gate (+9 more)
 
-### Community 43 - "Coverage Tests & Look-At"
-Cohesion: 0.57
-Nodes (6): look_at_yaw(), frame(), test_coverage_grows_around_the_object(), test_one_view_sees_one_face_and_triangulates_nothing(), test_second_view_from_new_angle_triangulates_and_has_highest_gain(), view()
+### Community 22 - "Room Tour ADRs"
+Cohesion: 0.16
+Nodes (16): Unknown rooms: explore then tour (ADR-K13), Room capture method tour (ADR-K11/K12), Current phase K1 with room track, Explore flights and pose drift findings, First object scene office_buddha, Room photogrammetry track (Warehouse), Tour flown 2026-10-18: 2.0 min, 403 keyframes, ATE 8.2 cm, Viewing distance vs flight cost (range_factor) (+8 more)
 
-### Community 44 - "Dependency Rule"
-Cohesion: 0.47
-Nodes (6): Dependency rule: planner/core never import rclpy, Dependency rule (planner/core never import rclpy), Architecture import-rule test, planner/ and core/ never import rclpy, rig adapters or offline/…, test_dependency_rule(), test_offline_never_imports_the_planner()
+### Community 24 - "Dry Rig Motion"
+Cohesion: 0.19
+Nodes (7): _cost(), on_img(), Turn the streamed yaw towards `target` by at most yaw_rate_deg_s x elapsed sim…, Transit: reach the camera pose (position and yaw tolerances, no settle time),…, The depth image of the same grab as an image stamped `stamp` (the wrapper…, camera_yaw(), wrap()
+
+### Community 25 - "Kinetix CLI"
+Cohesion: 0.22
+Nodes (12): argparse, cmd_bench(), cmd_eval(), cmd_pool(), cmd_sfm(), default_pool(), _git_sha(), main() (+4 more)
+
+### Community 26 - "Related Work and Mono vs Stereo"
+Cohesion: 0.16
+Nodes (12): Export to COLMAP and nerfstudio, ADR-K04 pycolmap only SfM backend, VGGT, ActMVS (Pu, Han, Lian 2026), COLMAP Structure-from-motion revisited, Depth Anything, FlyCo, FrontierNet (+4 more)
+
+### Community 27 - "Aerial Reconstruction Notes"
+Cohesion: 0.19
+Nodes (12): Hestia (WACV 2026), Huang et al. toy drone (monocular Bebop), Gap: no quantitative real-drone indoor object NBV with COLMAP output, Hestia entry (closest real-drone object NBV), Huang toy drone (108 vs 390 views), Verification legend [V]/[S]/[M], ActiveGS / NARUTO RGB-D baselines, Depth for planning vs depth for reconstruction (2x2) (+4 more)
+
+### Community 28 - "Baselines and Pool Format"
+Cohesion: 0.18
+Nodes (12): Method surface_normal (explore_exploit baseline), K2 harness and baseline matrix (9 methods, 3 scenes), T0 view-pool replay (PoolRig), View pool format pools/scene/pool, ADR-K02 Discrete view pools T0 as primary loop, Experimental axes (scenes, pools, methods, budgets, seeds), Baseline method set (orbit, fvs, volumetric_ig, fisherrf, ma_scvp, oracle), Adaptive view planning for aerial 3D reconstruction (Peng, Isler) (+4 more)
+
+### Community 29 - "Foundation Models in Planning"
+Cohesion: 0.23
+Nodes (11): Depth Anything V2, GraspView, MASt3R / DUSt3R, Relative depth scale-anchored online to SfM + TSDF frontier + SfM uncertainty, Next Best Sense, DUSt3R / MASt3R / VGGT pointmap models, No work scale-fits relative depth to SfM for object NBV on a drone, GraspView (VGGT + kinematic scale) (+3 more)
+
+### Community 30 - "Tour Bench"
+Cohesion: 0.35
+Nodes (10): geometry(), intrinsics(), main(), plan_and_fly(), Path, Tour benchmark: what a planning knob costs in flight and what it buys in…, Viewing geometry of `poses` on the true surface of `scene` (see the module doc)., One dry-rig tour of the Warehouse with `coverage.depth_range_m` capped at… (+2 more)
+
+### Community 31 - "C1 Contribution and Anchored Depth"
+Cohesion: 0.22
+Nodes (11): T3 real flight (MavrosRig on real ZED Mini), ADR-K08 Measurement paper positioning, M3 depth: Depth Anything V2 anchored to SfM points, Ablations incl. decisive depth anchoring, C1 SfM-anchored monocular NBV, C5 Quantitative real-flight evaluation and release, Key innovations C1-C5 (revised 2026-10-08), Kinetix project overview: adaptive dynamic photogrammetry (+3 more)
+
+### Community 32 - "Densify and Offline Pipeline"
+Cohesion: 0.35
+Nodes (9): Sim3 alignment to GT, densify.py (COLMAP MVS / gsplat / tsdf_depth), evaluate.py metrics.json, Offline reconstruction pipeline identical for every method, sfm.py pycolmap SfM, Dense reconstruction for real completeness figure, One metrics.json schema for every method, SfM bundle adjustment moves low-point cameras far from prior (+1 more)
+
+### Community 33 - "NBV Scorer Family"
+Cohesion: 0.22
+Nodes (10): combo scorer (Kinetix method, C1), depth_frontier scorer, fvs farthest-view sampling scorer, NBV scorers table (random, fvs, volumetric_ig, sfm_uncertainty, depth_frontier, combo, oracle), OccupancyMap depthmap and roomfit, sfm_uncertainty scorer, volumetric_ig scorer (Isler/Delmerico family), Connolly next best views 1985 (+2 more)
+
+### Community 34 - "Run Directory and Area Split"
+Cohesion: 0.20
+Nodes (10): Dependency rule enforced by test_boundaries.py, Module map (kinetix/, acquisition/, reconstruction/, bench/, sim/), Two-area split: acquisition vs reconstruction, Branch and PR policy, Data sync of large run files to GitHub release, Run directory is the only contract between areas, frames.jsonl and steps.jsonl records, metrics.json key set (+2 more)
+
+### Community 35 - "Sensing Modes"
+Cohesion: 0.22
+Nodes (10): Sensing modes: plan_depth and recon_input axes (ADR-K07), Sensing presets mono, mono_noprior, stereo_plan, stereo_full, oracle_depth, ADR-K03 Monocular rule (superseded), ADR-K07 Sensing mode as experiment axis, capture_at settle and capture sequence, Flight rosbag recording (MCAP), T2/T3 ROS 2 interface subset of bisg contract, Topic whitelist per sensing mode (+2 more)
+
+### Community 36 - "Radiance Field NBV"
+Cohesion: 0.38
+Nodes (9): ActiveGS, ActiveNeRF (ECCV 2022), ActiveSplat, FisherRF, NARUTO, NeurAR (RA-L 2023), PUN, Four families of radiance-field NBV (offline, online RGB-D, learned object-centric, geometry-prediction) (+1 more)
+
+### Community 37 - "Room Scan Script"
+Cohesion: 0.53
+Nodes (9): check(), die(), fly(), kx(), latest_run(), say(), sfm(), room_scan.sh script (+1 more)
+
+### Community 38 - "Exploration Tests"
+Cohesion: 0.25
+Nodes (9): hint_scene(), What the planner and the rig get in exploration mode: the take-off point, an…, explore_cfg(), The live sim run: EKF2 drifted ~1.4 m over an 11 min exploration, the same wall…, Flown 2026-10-27: the east wall mapped a second time 1.4 m out (pose drift);…, test_exploration_survives_ekf_drift_without_false_obstacles(), test_explore_does_not_read_the_scene_files_room(), test_fit_puts_the_wall_on_its_dense_sheet_not_on_a_drifted_copy_beyond_it() (+1 more)
+
+### Community 39 - "Depth and Snapshot Streams"
+Cohesion: 0.29
+Nodes (6): on_frame(), writer(), ndarray, Path, <run>/depth/<idx>.npy: float32 metres along the optical z, registered to the…, to_bgr()
+
+### Community 40 - "Room Photogrammetry Review"
+Cohesion: 0.43
+Nodes (7): Plan3D, Acquisition variables: GSD, parallax, overlap, image count, speed, drift, FC-Planner / PredRecon / SOAR, FUEL frontier planner, ICON drone (Zhang, Yang, Zou), Krisshnakumar et al. IROS 2026 time-budgeted 3DGS exploration, Room photogrammetry open problem: fewest images / shortest flight for stated accuracy
+
+### Community 41 - "Proxy Validation (V3)"
+Cohesion: 0.33
+Nodes (6): main(), Path, {N: (coverage, min overlap of frames 2..N with what came before)} at GT poses., replay(), spearman(), validate()
+
+### Community 42 - "ZED Depth Study"
+Cohesion: 0.33
+Nodes (7): ZED SVO recording for real-data depth study, ADR-K10 Pools carry real ZED SDK depth, Depth study (ZED SDK vs FoundationStereo vs DA-V2 vs GT), FoundationStereo, Hypothesis H1: stereo helps planning more than final accuracy, Research questions RQ1-RQ5, Stereo hardware does not break monocular plan
+
+### Community 43 - "Benchmarks and Venues"
+Cohesion: 0.38
+Nodes (6): GenNBV, GenNBV (CVPR 2024, Isaac Gym), Houses3K / OmniObject3D / Objaverse datasets, ObjView-Bench (Bonn, arXiv 2605.10707), Release norms of impactful NBV papers, Discrete view-pool replay protocol
+
+### Community 44 - "Work Plan Phases"
+Cohesion: 0.52
+Nodes (6): Work plan Phase 1: Foundation (weeks 1-4), Phase 2: Core algorithm (weeks 5-12), Phase 3: Optimization and efficiency (weeks 13-18), Phase 4: Evaluation (weeks 19-24), Phase 5: Paper writing (weeks 25-28), Isaac Sim + Pegasus + PX4 SITL + MAVROS stack
+
+### Community 46 - "Import Boundary Test"
+Cohesion: 0.50
+Nodes (4): ast, _imports(), Who may import whom (architecture.md §4, collaboration.md): the two areas meet…, test_import_boundaries()
+
+### Community 47 - "Setup and Environment"
+Cohesion: 0.40
+Nodes (4): Machine .env settings (KINETIX_DATA, CUDA_VISIBLE_DEVICES), Per-phase extras: gsplat, COLMAP Docker, FoundationStereo, Pre-sim-run checklist (stop lc-chat, bisg check/smoke), uv-managed Python environment (uv.lock)
+
+### Community 48 - "Cube Mesh Test"
+Cohesion: 0.50
+Nodes (4): Path, A 1 m cube in millimetres, outward winding, centred at the origin, as an…, test_build_cube(), write_cube_gltf()
+
+### Community 49 - "Data Prune Workflow"
+Cohesion: 0.67
+Nodes (3): Run data release assets (data/<run>/run.yaml), data/sync.sh release sync (prune), data prune GitHub workflow
 
 ## Knowledge Gaps
-- **1 isolated node(s):** `gt_mesh null: no GT mesh for the Warehouse`
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 130 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **6 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **79 isolated node(s):** `kinetix`, `render_server.sh script`, `SCENES_DIR`, `NBV utility (gain - travel - yaw cost)`, `Liu et al. 2026 (surface-normal NBV)` (+74 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 329 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **24 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `MavrosRig` connect `MavrosRig & Rig Config` to `Benchmarks, Venues & Scene Licences`, `Kinetix Idea & Applications`, `Constraints & Layered Config`, `Aerial Active Reconstruction Literature`, `Foundation Models in Planning`, `Geometry & Constraints Code`, `CLI, Coverage Code & Room Tests`, `Rig Protocol & Frame Types`, `bisg Platform & MAVROS Rig`, `Related Work & ActMVS`, `Contribution C3: N@q Metric`, `Mono vs Stereo Study`, `Workspace Sampler & Core Types`?**
-  _High betweenness centrality (0.133) - this node is a cross-community bridge._
-- **Why does `CoverageState` connect `CLI, Coverage Code & Room Tests` to `Room Capture & SfM Pipeline`, `Learned Reconstructability Papers`, `Planner Budget & Coverage Config`, `Testing & ReconState`, `Radiance-Field NBV Literature`, `Tour Method (ADR-K12)`, `Box Geometry`, `Coverage Tests & Look-At`, `Module Map & Config Code`, `Rig Protocol & Frame Types`, `Image-Efficiency Literature`, `Workspace Sampler & Core Types`?**
-  _High betweenness centrality (0.113) - this node is a cross-community bridge._
-- **Why does `run_sfm()` connect `Room Capture & SfM Pipeline` to `Kinetix Idea & Applications`, `Constraints & Layered Config`, `Aerial Active Reconstruction Literature`, `Radiance-Field NBV Literature`, `Orbit Baseline & Demo Scenes`, `Tour Method (ADR-K12)`, `Foundation Models in Planning`, `CLI, Coverage Code & Room Tests`, `Module Map & Config Code`, `Rig Protocol & Frame Types`, `Related Work & ActMVS`, `Contribution C3: N@q Metric`, `Mono vs Stereo Study`, `Baseline Families (FisherRF)`?**
-  _High betweenness centrality (0.090) - this node is a cross-community bridge._
-- **Are the 21 inferred relationships involving `MavrosRig` (e.g. with `rig.ns /drone_1 and camera_frame zed_left_camera_frame_optical` and `rig overrides: move_timeout 120 s, cruise_mps 1.0`) actually correct?**
-  _`MavrosRig` has 21 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 25 inferred relationships involving `CoverageState` (e.g. with `ReconState online reconstruction` and `ReconState API`) actually correct?**
-  _`CoverageState` has 25 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 12 inferred relationships involving `Pose` (e.g. with `camera_yaw()` and `BoxConstraints`) actually correct?**
-  _`Pose` has 12 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 13 inferred relationships involving `run_sfm()` (e.g. with `keyframe_step_m 0.4 / 6 deg: sequential overlap for SfM` and `Run directory (run.yaml, frames.jsonl, steps.jsonl, sfm, rosbag)`) actually correct?**
-  _`run_sfm()` has 13 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `OccupancyMap` connect `Occupancy Map` to `Room Tour Planner`, `Rig Adapters and Drift`, `Config and Session Loop`, `Exploration Tests`, `NBV Bench and Explore`, `Exploration Planner`, `Explore Tests`, `Room Fit`, `Geometry and Scorers`?**
+  _High betweenness centrality (0.050) - this node is a cross-community bridge._
+- **Why does `Pose` connect `Rig Adapters and Drift` to `Room Tour Planner`, `SfM and Bench Harness`, `Coverage Model`, `Core Types and Validation`, `MAVROS Rig`, `Exploration Planner`, `Explore Tests`, `Occupancy Map`, `Proxy Validation (V3)`, `Geometry and Scorers`, `Dry Rig Motion`, `Tour Bench`?**
+  _High betweenness centrality (0.046) - this node is a cross-community bridge._
+- **Why does `Intrinsics` connect `Config and Session Loop` to `Room Tour Planner`, `SfM and Bench Harness`, `Rig Adapters and Drift`, `Coverage Model`, `Core Types and Validation`, `MAVROS Rig`, `Exploration Planner`, `Explore Tests`, `Occupancy Map`, `Rig Liveness Tests`, `Proxy Validation (V3)`, `Geometry and Scorers`, `Dry Rig Motion`, `Kinetix CLI`, `Tour Bench`?**
+  _High betweenness centrality (0.032) - this node is a cross-community bridge._
+- **Are the 21 inferred relationships involving `Pose` (e.g. with `OccupancyMap` and `depth_points()`) actually correct?**
+  _`Pose` has 21 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 15 inferred relationships involving `Intrinsics` (e.g. with `OccupancyMap` and `depth_points()`) actually correct?**
+  _`Intrinsics` has 15 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 24 inferred relationships involving `CoverageState` (e.g. with `depth_surface()` and `run_tour()`) actually correct?**
+  _`CoverageState` has 24 INFERRED edges - model-reasoned connections that need verification._
+- **What connects `kinetix`, `render_server.sh script`, `SCENES_DIR` to the rest of the system?**
+  _79 weakly-connected nodes found - possible documentation gaps or missing edges._

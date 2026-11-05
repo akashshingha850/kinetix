@@ -1,6 +1,7 @@
 # Kinetix architecture
 
-Status: **K1** (object demo loop and room capture run on the bisg twin; pools, ReconState and the K3 scorers are not built). Research framing: [paper/research/idea.md](paper/research/idea.md).
+Status (2026-11-01): **K1/K2** (T0 pools + pool rig, sparse evaluation and `kinetix bench` with 9 baselines on 3 scenes; T1/T2 rigs
+flown; ReconState and the K3 scorers are not built; [roadmap.md](roadmap.md)). Research framing: [paper/research/idea.md](paper/research/idea.md).
 Related docs: [interfaces.md](interfaces.md) (APIs, ROS topics, frames), [data-format.md](data-format.md)
 (on-disk layouts), [roadmap.md](roadmap.md) (phases + exit tests), [testing.md](testing.md),
 [paper/benchmark.md](paper/benchmark.md), [decisions.md](decisions.md) (ADRs).
@@ -89,8 +90,8 @@ Same loop, same config, a different `rig:`. Each tier is a superset of the reali
 
 | Tier | Rig adapter | Where images come from | Poses | Ground truth | Speed | Used for |
 |---|---|---|---|---|---|---|
-| **T0** replay | `PoolRig` | pre-rendered **view pool** (discrete candidates) | exact pool poses (+ optional noise) | mesh + GT depth | seconds | algorithm dev, unit/component tests, most benchmark runs |
-| **T1** render | `IsaacRenderRig` | Isaac renders a camera teleported to any pose | exact (+ optional noise) | mesh + GT depth | ~1 s/view | continuous candidate spaces, photoreal checks, **generates T0 pools** |
+| **T0** replay (built 2026-11-01, rig `pool`) | `PoolRig` | pre-rendered **view pool** (discrete candidates) | exact pool poses (+ optional noise) | mesh + GT depth | seconds | algorithm dev, unit/component tests, most benchmark runs |
+| **T1** render (built 2026-10-31, rig `isaac`) | `IsaacRenderRig` | Isaac renders a camera teleported to any pose | exact (+ optional noise) | mesh + GT depth | ~1 s/view | continuous candidate spaces, photoreal checks, **generates T0 pools** |
 | **T2** sim flight | `MavrosRig` | ZED SDK twin left (+ right, SDK depth in stereo modes) in the bisg sim | EKF2 `local_position` | Pegasus `state/pose` + mesh | real time × 0.3–0.5 | dynamics, settle time, flight-time metrics, pose noise |
 | **T3** real | `MavrosRig` | real ZED Mini left (+ right, SDK depth) | EKF2 (ZED VIO) | external scan of the object (if any) | real time | validation |
 
@@ -101,18 +102,33 @@ the next-best-view problem becomes a discrete selection. That is deterministic, 
 the NBV literature. T1 (batch mode) produces pools. T0 also works for real data: a dense real capture
 becomes a real pool.
 
+## 3a. One session, oracle to real flight
+
+A session is `kinetix run --method M --rig R`. The planner code is the same in every cell; what changes is **what the method reads**
+(its row in `acquisition/planner/methods.py`) and **where frames come from** (the rig). Debug a method from the top of this table
+down: a fault that shows on `dry` or `pool` is a planner fault, one that first shows on `mavros` is flight or sensing.
+
+| Method kind (methods.py) | dry (unit tests) | pool T0 | isaac T1 | mavros T2 sim | mavros T3 real |
+|---|---|---|---|---|---|
+| GT-free, box surface (`roi_coverage`, `fvs`, `random`, `orbit*`, `tour`) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| depth (`volumetric_ig`, `depth_coverage`, `surface_normal`) | ✓ (synthetic depth) | ✓ **GT depth** † | ✓ **GT depth** † | ✓ ZED depth | ✓ ZED depth |
+| oracle (`coverage_oracle`, surface `gt`) | needs GT files | ✓ † | ✓ † | ✓ † | ✗ no GT: stops at start (`gt_surface` raises) |
+
+† `run.yaml uses_gt: true` (`methods.uses_gt`), marked in every bench table. Frames carry `gt_pose` on every rig that knows it
+(dry, pool, isaac, and T2 through Pegasus `state/pose`). On T3 `gt_pose` is null, and ground truth for evaluation is open question Q4.
+
 ## 4. Module map
 
 Layout: three top-level packages, no `src/`. `kinetix/` is the small shared library, `acquisition/` (author A) and
 `reconstruction/` (author B) are the two areas ([collaboration.md](collaboration.md)); each keeps its tests in its own `tests/`.
-Target layout (created incrementally per [roadmap.md](roadmap.md); not built yet: `pool.py`, `isaac_render.py`, `state.py`,
-`depth/`, `seed.py`, `sequence.py`, most scorers, `external/`, `densify.py`, `metrics.py`, `evaluate.py`, `bench/`, `sim/`):
+Target layout (created incrementally per [roadmap.md](roadmap.md); not built yet, 2026-11-02: `mapping/state.py`, `mapping/depth/`,
+`seed.py`, `sequence.py`, the scorers `sfm_uncertainty`, `depth_frontier`, `combo`, `coverage_oracle` as its own file, and `external/`):
 
 ```
 kinetix/                         shared: both areas import it, it imports neither (cli.py excepted)
   types.py       Pose, Intrinsics, Frame, Candidate, Scene, RunInfo (dataclasses)
   geometry.py    SE3/Sim3, look-at, frame conversions (ENU map, OpenCV optical, COLMAP)
-  config.py      YAML layering + key=value overrides; ROOT, DATA, RESULTS, SCENES paths
+  config.py      YAML layering + key=value overrides; ROOT, DATA, SCENES paths
   runlog.py      run-directory writer/reader (data-format.md)
   align.py       Sim3 / Umeyama, ATE
   coverage.py    surface-coverage model (planner gain, reconstruction's completeness proxy)
@@ -122,6 +138,8 @@ kinetix/                         shared: both areas import it, it imports neithe
 acquisition/                     author A: decides where to fly and what to capture
   planner/
     loop.py        the session entry point (§5): `run_session` picks the method's loop
+    methods.py     every method in one table: its loop, fixed or scored, the surface it plans on (box | gt | depth), whether it
+                   needs depth; `uses_gt(method, rig)` is the run.yaml flag (§3a)
     nbv.py         stepwise NBV loop (roi_coverage, random, orbit): select (argmax of gain − λ·travel cost),
                    stop rule (budget / coverage / gain plateau), orbit order
     explore.py     unknown room: occupancy map from ZED depth, frontier views, room fit (§5b)
@@ -134,7 +152,8 @@ acquisition/                     author A: decides where to fly and what to capt
   mapping/         online models: depthmap.py (occupancy), register.py (drift), roomfit.py, state.py (online SfM),
                    depth/ (DepthSource per frame: mono / stereo_learned / stereo_zed / gt)
   rig/             base.py (Rig protocol + RigCaps), dry.py + simdepth.py, mavros.py (T2/T3), pool.py (T0), isaac_render.py (T1)
-  config/          default.yaml, room.yaml (methods/*.yaml, rigs/*.yaml later)
+  config/          common.yaml, object.yaml | room.yaml (by scene kind), experiments/*.yaml (--config overlays)
+  compare.py       runs side by side by their SfM result + the config keys that differ
   tests/           unit tests + nbv_bench.py
 reconstruction/                  author B: turns a flight into a model and scores it
   sfm.py         final SfM over all captured frames (pycolmap; video/covis pairing, rig check, known-pose mode)
@@ -142,8 +161,7 @@ reconstruction/                  author B: turns a flight into a model and score
   metrics.py     accuracy, completeness, Chamfer, F-score, ATE, PSNR/SSIM
   evaluate.py    run dir → metrics.json
   tests/
-data/            flights, one run dir each (large files git-ignored, data/sync.sh; data-format.md §3); written by acquisition
-results/         results/<run>/<method>/ (large files git-ignored, same); written by reconstruction
+data/            one run dir each (large files git-ignored, data/sync.sh; data-format.md §3): the flight by acquisition, <method>/ by reconstruction
 bench/           matrix.py (scenes × methods × budgets × seeds → runs), report.py (tables + efficiency curves)
 sim/             render_server.py (Isaac standalone, pool batch + serve mode), scene build helpers
 docker/          Dockerfile (ros:jazzy-ros-base), compose.yaml
@@ -170,7 +188,7 @@ numbers. The offline pipeline (§9) is [reconstruction/pipeline.md](reconstructi
 One YAML per run, resolved from layers and stored verbatim in the run directory:
 
 ```
-acquisition/config/default.yaml  <  acquisition/config/rigs/<tier>.yaml  <  acquisition/config/methods/<method>.yaml  <  data/scenes/<scene>/scene.yaml  <  CLI key=value
+acquisition/config/common.yaml  <  object.yaml | room.yaml (scene kind)  <  --config files (experiments/*.yaml)  <  CLI key=value
 ```
 
 Components are chosen by name (`planner.scorer: combo`, `rig: pool`, `reconstruction.densify: gsplat`).
@@ -195,8 +213,8 @@ GPU budget on workstation B (2× RTX 6000 Ada): Isaac on GPU 0, depth prior / gs
 | # | Question | Blocks |
 |---|---|---|
 | Q1 | ZED mount pitch for scanning: keep 0° (top surfaces barely seen) or a tilted mount for Kinetix flights? Changes the bisg twin too. | K4 / T3 |
-| Q2 | Object set: which USD assets (SimReady / YCB / Objaverse-converted) with clean GT meshes? 3 for K1–K3, 8–10 for the paper. | K1 |
-| Q3 | bisg integration: a read-only mount of `$KINETIX_DATA/scenes` into the sim container so `world.usd_path` can point to a Kinetix scene (small bisg compose change, done in bisg with its own docs). | K1 (pool generation) |
+| Q2 | Object set: which USD assets (SimReady / YCB / Objaverse-converted) with clean GT meshes? 3 for K1–K3, 8–10 for the paper. First one 2026-10-31: `office_buddha` (Smithsonian Open Access scan, CC0, textured, 1.51 m; `sim/scenes/`); Smithsonian 3D (CC0, textured glTF, `3d-api.si.edu`) is a source for more. | K1 |
+| Q3 | bisg integration: a read-only mount of `$KINETIX_DATA/scenes` into the sim container so `world.usd_path` can point to a Kinetix scene. **Answered 2026-10-31:** bisg `SCENES_DIR` (config/bisg.conf, this machine in bisg `docker/.env`) is mounted at `/scenes`; each scene folder carries a `bisg.yaml` locator (`./bisg all headless -c $KINETIX_DATA/scenes/<name>/bisg.yaml`). | K1 (pool generation) |
 | Q4 | Ground truth for real objects (T3): handheld scanner / reference photogrammetry with 300+ images? | K6 |
 | Q5 | Is the drone pose (EKF2 + ZED VIO) allowed as a prior in the paper's "monocular" claim? Default: yes, reported as an ablation (`pose_source: sfm` vs `prior`). Navigation is stereo in every mode. | paper |
 | Q6 | Stereo depth on T0 pools. **Answered 2026-10-10 (ADR-K10):** pools store real ZED SDK depth rendered through the twin (`zed/`), and FoundationStereo stays as the fallback and as an ablation. Open: whether a 0.6 s settle per view is fast enough for the large Tammes pools (≈ 7 min / 600 views measured). | K1 |

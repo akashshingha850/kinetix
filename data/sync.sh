@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Large run files on a GitHub release, one zip per run. A run's small text files (run.yaml, frames.jsonl, metrics.json, ...) are in
-# git and say which runs exist; the release only stores the large ones (the git-ignored part of data/<run>/ and results/<run>/:
+# git and say which runs exist; the release only stores the large ones (the git-ignored part of data/<run>/:
 # frames, depth, rosbag, SfM models; the list is .gitignore). A run deleted from git is never brought back.
 #
 # Automatic (docs/collaboration.md "Shared data"; once per clone: git config core.hooksPath .githooks):
@@ -19,12 +19,18 @@
 #   data/sync.sh prune [-y] [RUN...]    delete release copies of runs not in git (default: all of them)
 #
 # RUN is a run id or a path to it. Env: KX_DATA_REPO (default: this repo, akashshingha850/kinetix, private), KX_DATA_TAG (default:
-# data), TMPDIR (zips are staged there: a run needs its size free, ~7 GB for a tour). GitHub caps an asset at 2 GiB: bigger zips go up as <RUN>.zip.00, .01, ...
+# data), KX_PART_MB (part size, default 1000), TMPDIR (zips are staged there: a run needs its size free, ~7 GB for a tour). Zips over PART_MB go up as <RUN>.zip.000, .001, ...
+# (older runs: .00, .01). Parts, because a stall costs one part, which is retried: on the old lab uplink GitHub dropped an upload idle
+# for 60 s (HTTP 408) as it black-holed one TCP flow for ~70 s every minute or two (2026-11-01, ss -ti: RTO backoff to 34 s), so the
+# parts were 50 MB; the new uplink (2026-11-02) does 1 GB in 53 s at ~150 Mbit/s without a stall, hence 1000. Set KX_PART_MB=50 if it
+# stalls again.
+# Parts go up as <name>.part and are renamed once all are up, so an interrupted push never looks like a complete run.
 set -euo pipefail
 
 KX="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TAG="${KX_DATA_TAG:-data}"
-PART_MB=1900
+PART_MB="${KX_PART_MB:-1000}"   # GitHub allows 2 GiB per asset; lower it (e.g. 50) on a flaky uplink, a stall then costs less
+TRIES=10
 DROPPED=data/.dropped
 
 say(){ printf '\033[1;36m[sync]\033[0m %s\n' "$*"; }
@@ -36,17 +42,21 @@ REPO="${KX_DATA_REPO:-akashshingha850/kinetix}"   # this repo's own release: pri
 STAGE=$(mktemp -d); trap 'rm -rf "$STAGE"' EXIT
 
 assets(){ gh release view "$TAG" -R "$REPO" --json assets -q '.assets[] | "\(.name) \(.size)"' 2>/dev/null || true; }
-release_runs(){ assets | awk '{print $1}' | sed -E 's/\.zip(\.[0-9]+)?$//' | sort -u; }
+release_runs(){ assets | awk '{n = $1; p = sub(/\.part$/, "", n); sub(/\.zip(\.[0-9]+)?$/, "", n); if (p) part[n]; else ok[n]}  # .part: unfinished
+  END {for (r in ok) if (!(r in part)) print r}' | sort -u; }
 git_runs(){ git ls-files 'data/*/run.yaml' | cut -d/ -f2 | sort -u; }
 local_runs(){ for d in data/*/; do r=$(basename "$d"); [[ -f $d/run.yaml || -n $(big_files "$r") ]] && echo "$r"; done | sort -u; }
 dropped(){ sort -u "$DROPPED" 2>/dev/null || true; }
-big_files(){ git ls-files --others --ignored --exclude-standard -- "data/$1" "results/$1"; }
+big_files(){ git ls-files --others --ignored --exclude-standard -- "data/$1"; }
 run_ids(){ for r in "$@"; do basename "${r%/}"; done; }
 confirm(){ [[ $YES == 1 ]] && return; read -r -p "$1 [y/N] " a; [[ $a == [yY]* ]]; }
 undrop(){ [[ -f $DROPPED ]] && { grep -vxF "$1" "$DROPPED" > "$DROPPED.tmp" || true; mv "$DROPPED.tmp" "$DROPPED"; }; return 0; }
+retry(){ local i; for i in 1 2 3 4 5; do "$@" && return; say "retrying $1 in 30 s"; sleep 30; done; "$@"; }  # api.github.com drops out too
 
-delete_assets(){ for a in $(assets | awk -v r="$1" '$1 == r".zip" || index($1, r".zip.") == 1 {print $1}'); do
-  gh release delete-asset "$TAG" "$a" -R "$REPO" -y >/dev/null; done; }
+# the API also lists failed uploads (state "starter"), which `gh release view` hides and which block a re-upload of that name
+release_assets(){ gh api --paginate "repos/$REPO/releases/$(gh api "repos/$REPO/releases/tags/$TAG" -q .id)/assets" -q '.[] | "\(.id) \(.name)"'; }
+delete_assets(){ release_assets | awk -v r="$1" '$2 == r || $2 == r".zip" || index($2, r".zip.") == 1 {print $1}' |  # RUN or one asset name
+  while read -r a; do gh api -X DELETE "repos/$REPO/releases/assets/$a" >/dev/null; done; }
 
 push_run(){
   local run=$1 files tmp="$STAGE/$1"
@@ -56,21 +66,37 @@ push_run(){
   say "$run: zipping $(wc -l <<<"$files") files"
   zip -q -1 "$tmp/$run.zip" -@ <<<"$files"                   # paths relative to the repo root: pull unzips in place
   if (( $(stat -c %s "$tmp/$run.zip") > PART_MB * 1024 * 1024 )); then
-    split -b "${PART_MB}M" -d -a 2 "$tmp/$run.zip" "$tmp/$run.zip." && rm "$tmp/$run.zip"
+    split -b "${PART_MB}M" -d -a 3 "$tmp/$run.zip" "$tmp/$run.zip." && rm "$tmp/$run.zip"
   fi
-  delete_assets "$run"                                       # the old copy may have more parts
+  for f in "$tmp"/*; do mv "$f" "$f.part"; done
+  retry delete_assets "$run"                                 # the old copy may have more parts
   say "$run: uploading $(du -sh "$tmp" | cut -f1) ($(ls "$tmp" | wc -l) asset(s))"
-  gh release upload "$TAG" "$tmp"/* -R "$REPO"
+  for f in "$tmp"/*; do
+    for ((try = 1; ; try++)); do
+      gh release upload "$TAG" "$f" -R "$REPO" && break
+      (( try < TRIES )) || die "$run: $(basename "$f") failed $TRIES times; push again to retry the run"
+      say "$run: retrying $(basename "$f") ($try/$TRIES failed)"
+      sleep 10                                                 # the uplink also drops out for a few seconds
+      delete_assets "$(basename "$f")" || true                 # the failed upload's starter asset blocks its name
+    done
+  done
+  retry finish_run "$run"
   rm -rf "$tmp"
 }
 
+finish_run(){ release_assets | awk -v r="$1" 'index($2, r".zip") == 1 && $2 ~ /\.part$/' | while read -r id name; do
+  gh api -X PATCH "repos/$REPO/releases/assets/$id" -f name="${name%.part}" >/dev/null; done; }
+
 pull_run(){
   local run=$1 tmp="$STAGE/$1"
+  grep -qxF "$run" <(release_runs) || die "$run is not (completely) on release '$TAG'"
   mkdir -p "$tmp"
   say "$run: downloading"
   gh release download "$TAG" -R "$REPO" -D "$tmp" -p "$run.zip" -p "$run.zip.*" || die "$run is not on release '$TAG'"
   [[ -f $tmp/$run.zip ]] || cat "$tmp/$run.zip".* > "$tmp/$run.zip"   # parts .00 .01 ... glob in order
   unzip -q -o "$tmp/$run.zip" -d "$KX"
+  # zips pushed before 2026-10-30 hold the SfM under results/<run>/: move it into the run dir
+  if [[ -d $KX/results/$run ]]; then cp -a "$KX/results/$run/." "$KX/data/$run/"; rm -rf "${KX:?}/results/$run"; rmdir "$KX/results" 2>/dev/null || true; fi
   rm -rf "$tmp"
   undrop "$run"
   say "$run: done ($(du -sh "data/$run" | cut -f1) in data/)"
@@ -114,7 +140,7 @@ case "$cmd" in
     (($#)) || die "drop RUN..."
     for r in $(run_ids "$@"); do
       grep -qxF "$r" <(release_runs) || confirm "$r is not on the release: its large files exist only here. Drop them?" || continue
-      big_files "$r" | xargs -r -d '\n' rm -f; find "data/$r" "results/$r" -type d -empty -delete 2>/dev/null || true
+      big_files "$r" | xargs -r -d '\n' rm -f; find "data/$r" -type d -empty -delete 2>/dev/null || true
       echo "$r" >> "$DROPPED"
       say "$r: large files dropped (git and the release keep it; pull --all skips it here, data/sync.sh pull $r gets it back)"
     done;;
@@ -123,8 +149,8 @@ case "$cmd" in
     for r in $(run_ids "$@"); do
       confirm "delete $r everywhere (local files, git, release)?" || continue
       delete_assets "$r"
-      git rm -r -q --ignore-unmatch -- "data/$r" "results/$r" >/dev/null
-      rm -rf "data/$r" "results/$r"; undrop "$r"
+      git rm -r -q --ignore-unmatch -- "data/$r" >/dev/null
+      rm -rf "data/$r"; undrop "$r"
       say "$r: deleted (commit the git rm)"
     done;;
   prune)
@@ -132,6 +158,6 @@ case "$cmd" in
     else gone=$(comm -13 <(git_runs) <(release_runs)); fi
     [[ -n $gone ]] || { say "nothing to prune"; exit 0; }
     for r in $gone; do confirm "$r is on the release but not in git: delete its release copy?" && { delete_assets "$r"; say "$r: release copy deleted"; }; done;;
-  -h|--help|help) sed -n 2,22p "$0";;
+  -h|--help|help) sed -n 2,27p "$0";;
   *) die "unknown command $cmd (see --help)";;
 esac

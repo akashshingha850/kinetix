@@ -1,0 +1,8 @@
+{"step": 0, "stage": "coarse", "chosen": "r1.60_z1.35_a180", "coverage": 0.0, "error": null}
+{"step": 1, "stage": "coarse", "chosen": "r1.60_z1.35_a225", "coverage": 0.2104, "error": null}
+{"step": 2, "stage": "coarse", "chosen": "r1.60_z1.35_a270", "coverage": 0.333, "error": null}
+{"step": 3, "stage": "coarse", "chosen": "r1.60_z1.35_a315", "coverage": 0.3357, "error": null}
+{"step": 4, "stage": "coarse", "chosen": "r1.60_z1.35_a000", "coverage": 0.5553, "error": null}
+{"step": 5, "stage": "coarse", "chosen": "r1.60_z1.35_a045", "coverage": 0.5618, "error": null}
+{"step": 6, "stage": "coarse", "chosen": "r1.60_z1.35_a090", "coverage": 0.6848, "error": null}
+{"step": 7, "stage": "coarse", "chosen": "r1.60_z1.35_a135", "coverage": 0.6957, "error": null}

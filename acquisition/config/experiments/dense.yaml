@@ -1,0 +1,7 @@
+# More overlap: a keyframe every 0.25 m or 4 deg (room default 0.4 m / 6 deg). Hypothesis: longer tracks and fewer split models,
+# at ~1.6x the images and SfM time.
+experiment: dense
+planner:
+  tour:
+    keyframe_step_m: 0.25
+    keyframe_step_deg: 4.0

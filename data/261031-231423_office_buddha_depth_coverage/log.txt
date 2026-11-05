@@ -1,0 +1,44 @@
+[     0.0s] run 261031-231423_office_buddha_depth_coverage: scene office_buddha (object), method depth_coverage, rig isaac, budget 20
+[     0.0s] coverage model: 2928 surface points, 0 occluders
+[     0.2s] step 0: -> r1.60_z1.35_a180 gain 0.089 (112/192 feasible)
+[     0.4s] frame 0: 520 surface pts in view, coverage 0.000 (seen 0.178), pose err 0.000 m
+[     0.5s] step 1: -> r1.60_z1.00_a180 gain 0.208 (95/192 feasible)
+[     0.6s] frame 1: 700 surface pts in view, coverage 0.178 (seen 0.239), pose err 0.000 m
+[     0.6s] step 2: -> r1.60_z1.00_a165 gain 0.061 (94/192 feasible)
+[     1.0s] frame 2: 704 surface pts in view, coverage 0.237 (seen 0.242), pose err 0.000 m
+[     1.0s] step 3: -> r1.60_z1.70_a150 gain 0.076 (93/192 feasible)
+[     1.5s] depth_coverage: surface from 4 views' depth: 891 patches + 2069 unseen box points, coverage 0.237 -> 0.246
+[     1.5s] frame 3: 504 surface pts in view, coverage 0.246 (seen 0.272), pose err 0.000 m
+[     1.5s] step 4: -> r1.60_z1.00_a210 gain 0.141 (108/192 feasible)
+[     1.7s] frame 4: 1022 surface pts in view, coverage 0.247 (seen 0.406), pose err 0.000 m
+[     1.7s] step 5: -> r1.60_z1.00_a225 gain 0.146 (107/192 feasible)
+[     1.9s] frame 5: 987 surface pts in view, coverage 0.380 (seen 0.431), pose err 0.000 m
+[     1.9s] step 6: -> r1.20_z1.00_a255 gain 0.092 (106/192 feasible)
+[     2.0s] frame 6: 545 surface pts in view, coverage 0.388 (seen 0.431), pose err 0.000 m
+[     2.0s] step 7: -> r1.60_z1.70_a255 gain 0.057 (71/192 feasible)
+[     2.2s] frame 7: 375 surface pts in view, coverage 0.388 (seen 0.432), pose err 0.000 m
+[     2.2s] step 8: -> r1.60_z2.00_a240 gain 0.065 (96/192 feasible)
+[     2.3s] frame 8: 487 surface pts in view, coverage 0.391 (seen 0.511), pose err 0.000 m
+[     2.4s] step 9: -> r1.60_z2.00_a225 gain 0.109 (123/192 feasible)
+[     2.5s] frame 9: 540 surface pts in view, coverage 0.472 (seen 0.512), pose err 0.000 m
+[     2.5s] step 10: -> r1.60_z1.00_a135 gain 0.103 (122/192 feasible)
+[     2.7s] frame 10: 927 surface pts in view, coverage 0.479 (seen 0.622), pose err 0.000 m
+[     2.7s] step 11: -> r1.60_z1.00_a120 gain 0.139 (103/192 feasible)
+[     2.8s] frame 11: 840 surface pts in view, coverage 0.591 (seen 0.627), pose err 0.000 m
+[     2.9s] step 12: -> r1.60_z2.00_a135 gain 0.055 (102/192 feasible)
+[     3.0s] frame 12: 464 surface pts in view, coverage 0.592 (seen 0.629), pose err 0.000 m
+[     3.0s] step 13: -> r1.20_z2.00_a180 gain 0.052 (121/192 feasible)
+[     3.2s] frame 13: 346 surface pts in view, coverage 0.592 (seen 0.629), pose err 0.000 m
+[     3.2s] step 14: -> r1.60_z2.00_a210 gain 0.033 (95/192 feasible)
+[     3.3s] frame 14: 531 surface pts in view, coverage 0.594 (seen 0.629), pose err 0.000 m
+[     3.4s] step 15: -> r1.20_z1.70_a210 gain 0.021 (117/192 feasible)
+[     3.5s] frame 15: 248 surface pts in view, coverage 0.594 (seen 0.629), pose err 0.000 m
+[     3.5s] step 16: -> r1.20_z1.70_a225 gain 0.021 (76/192 feasible)
+[     3.7s] frame 16: 338 surface pts in view, coverage 0.594 (seen 0.629), pose err 0.000 m
+[     3.7s] step 17: -> r1.60_z1.00_a255 gain 0.039 (92/192 feasible)
+[     3.9s] frame 17: 674 surface pts in view, coverage 0.598 (seen 0.629), pose err 0.000 m
+[     3.9s] step 18: -> r1.60_z1.35_a255 gain 0.021 (89/192 feasible)
+[     4.0s] frame 18: 526 surface pts in view, coverage 0.598 (seen 0.629), pose err 0.000 m
+[     4.0s] step 19: -> r1.60_z2.00_a270 gain 0.031 (88/192 feasible)
+[     4.2s] frame 19: 405 surface pts in view, coverage 0.598 (seen 0.629), pose err 0.000 m
+[     4.4s] run closed: {'frames': 20, 'registered': None, 'travel_m': 16.16, 'wall_s': 4.4, 'sim_s': None, 'stop_reason': 'budget', 'coverage': 0.598, 'seen': 0.6294}

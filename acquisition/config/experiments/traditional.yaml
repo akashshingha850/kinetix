@@ -1,0 +1,5 @@
+# Baseline arm for --explore runs: exploration only maps, its views are not keyframes, the tour scans the whole room from scratch
+# (the run is named ...-explore-trad). Compare with the default (explore-opt) for what reusing exploration views saves.
+experiment: traditional
+explore:
+  reuse_views: false

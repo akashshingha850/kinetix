@@ -73,13 +73,16 @@ def _cost(a: Pose, b: Pose, yaw_cost_m: float) -> float:
     return float(np.linalg.norm(a.p - b.p) + yaw_cost_m * abs(wrap(camera_yaw(a) - camera_yaw(b))))
 
 
-def order_tour(start: Pose, poses: list[Pose], yaw_cost_m: float = 1.0, iters: int = 50) -> list[int]:
-    """Visiting order of `poses` for an open tour from `start` (nearest neighbour, then 2-opt until no improvement)."""
+def order_tour(start: Pose, poses: list[Pose], yaw_cost_m: float = 1.0, iters: int = 50, blocked=None) -> list[int]:
+    """Visiting order of `poses` for an open tour from `start` (nearest neighbour, then 2-opt until no improvement).
+    `blocked(p, q)` (optional): True for a straight leg that may not be flown; such legs cost 1 km, so they are used only
+    when nothing else connects."""
     n = len(poses)
     if n < 2:
         return list(range(n))
     nodes = [start] + list(poses)
-    C = np.array([[_cost(a, b, yaw_cost_m) for b in nodes] for a in nodes])
+    C = np.array([[_cost(a, b, yaw_cost_m) + (1e3 if blocked is not None and blocked(a.p, b.p) else 0.0) for b in nodes]
+                  for a in nodes])
     order = [0]
     left = set(range(1, n + 1))
     while left:
@@ -160,7 +163,7 @@ def run_tour(cfg: dict, scene: Scene, rig, recon, log, truth: Scene | None = Non
             scene = apply_shift(rig, scene, recon, log)
         t0 = time.time()
         g = pc["grid"]
-        sampler = GridSampler(g["spacing_m"], g["heights"], g["n_yaw"])
+        sampler = GridSampler(g["spacing_m"], g["heights"], g["n_yaw"], g.get("layer_m"))
         cands = sampler.sample(scene, recon, rig.caps)
         start = rig.pose()
         feas = BoxConstraints(pc["clearance_m"], pc["roi_clearance_m"]).feasible(cands, start, scene)
