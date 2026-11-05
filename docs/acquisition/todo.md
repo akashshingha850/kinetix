@@ -3,6 +3,14 @@
 Current phase: **K1**, with a room-capture track run ahead of it (ADR-K11, ADR-K12). Phase definitions and exit tests:
 [roadmap.md](../roadmap.md). The evidence for each done item is in the ADR it names and in its run directory.
 
+## Testbed: one scene first (2026-11-05)
+- [x] Scene set cut to `office_buddha` for the object testbed: `office_monster` and `office_chair` recipes deleted from `sim/scenes/`,
+  `config/bench/{baselines,dense,oracle}.yaml` use `scenes: [office_buddha]`. Old bench outputs in `$KINETIX_DATA/bench/` still hold their cells.
+- [ ] Build and validate the pipeline on `office_buddha` (S1–S4; roadmap.md). No claim from one scene.
+- [ ] S5: add scenes back to 8–10 (≥ 3 GSO/Objaverse++), incl. `office_monster` (dark, low texture) and `office_chair` (no colour):
+  restore the recipes from git, rebuild with `sim/build_scene.py`, `kinetix pool make --scene <s>`, re-run the bench matrices.
+  Freeze planner weights on `office_buddha` before the new scenes run.
+
 ## Structure and research framing (2026-11-02)
 - [x] One method table, `acquisition/planner/methods.py`: loop, fixed/scored, surface (box | gt | depth), needs depth, and
   `uses_gt(method, rig)`. `kinetix/cli.py`, `planner/loop.py` and `planner/nbv.py` read it instead of testing method names

@@ -5,10 +5,6 @@
 coverage:
   spacing_m: 0.5                 # surface sample spacing on the room/obstacle faces (~8.5 k points in the Warehouse)
   depth_range_m: [0.3, 12.0]     # 12 m at fx 530 = 2.3 cm per pixel: still matchable texture
-  max_incidence_deg: 75.0
-  tri_min_deg: 8.0
-  novel_deg: 25.0
-  max_views: 6
   match_max_deg: 20.0            # rays further apart than this are not counted as matchable (no triangulation, no overlap).
                                  # Measured on the 2026-10-17 Warehouse flight (1128 pairs, SIFT + rig-checked verification):
                                  # P(match) 0.36-0.48 below 30 deg, 0.15 at 30-45, 0.04 at 60-90, 0 beyond 90

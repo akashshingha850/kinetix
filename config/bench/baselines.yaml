@@ -2,7 +2,7 @@
 # T0 (pool rig): render the pools first, `kinetix pool make --scene <s>` per scene. Results in $KINETIX_DATA/bench/baselines/.
 name: baselines
 rig: pool
-scenes: [office_buddha, office_monster, office_chair]
+scenes: [office_buddha]
 budgets: [5, 10, 20, 30, 40, 60, 80]
 seeds: [0, 1, 2]
 overrides: [planner.coverage_target=2.0, planner.min_gain=-1.0]   # budget curves: only the budget (or no view left) stops a session

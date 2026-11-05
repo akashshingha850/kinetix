@@ -6,7 +6,7 @@ name: dense
 rig: pool
 runs_from: baselines
 densify: {backend: colmap_mvs, max_image_size: 640, num_src: 8, geom: false}
-scenes: [office_buddha, office_monster, office_chair]
+scenes: [office_buddha]
 budgets: [10, 20, 40, 80]
 seeds: [0, 1, 2]
 overrides: [planner.coverage_target=2.0, planner.min_gain=-1.0]

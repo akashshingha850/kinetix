@@ -15,12 +15,18 @@ levels V0–V8 with pass criteria, and the **flight gate**. No new T2 (PX4/ROS) 
 | Phase | Name | Status (2026-11-01) | Gate | Feeds |
 |---|---|---|---|---|
 | K0 | Foundations: docs, environment, novelty search | ✅ | — | positioning |
-| K1 | Core, scenes, T0 replay, first pools | 🟡 3 scenes + ring pools + pool rig; Tammes pool, online ReconState, test fixture open | G1 | C4 (T0) |
+| K1 | Core, scenes, T0 replay, first pools | 🟡 testbed = `office_buddha` only (2026-11-05), ring pool + pool rig; Tammes pool, online ReconState, test fixture open | G1 | C4 (T0) |
 | K2 | Evaluation + benchmark harness, baselines | 🟡 sparse eval + `kinetix bench` + 9 baselines, first matrix run; densify and stereo-rig SfM open | **G1 2026-11-12** | C3 |
 | K3 | NBV core: the C1 method, anchoring and sensing studies | ⬜ nothing built | **G2 2026-12-17** (C1 go/no-go) | C1, C2 |
 | K4 | Closed loop in sim (T1 serve, T2 flight) | 🟡 rigs built and flown early; tier-transfer runs and exit tests open | G3 2027-01-07 | C4 (T1/T2) |
 | K5 | Optimisation | ⬜ | — | only what improves C1–C5 |
 | K6 | Real drone + paper | ⬜ (needs bisg Phase 5) | G4, G5 | C5, C2/C4 on hardware |
+
+**Testbed first, scenes later (2026-11-05).** The pipeline is built and validated on one scene, `office_buddha` (the tuning scene and the
+only one with a T1 comparison), so every change is checked against one known case. `office_monster` (dark, low texture) and
+`office_chair` (no colour texture) were removed from `sim/scenes/` and the bench matrices and come back in S5 with the rest of the 8–10
+(recipes: `git log --diff-filter=D -- sim/scenes/office_monster.yaml`). With one scene a result is a testbed result, not a claim: no
+benchmark or ranking statement leaves S4 before S5 has run. The room track (`warehouse_room`) is unchanged and not part of this matrix.
 
 ## Steps to submission (2026-11-02, ordered by research question)
 
@@ -33,8 +39,8 @@ compensated later. The K-phases below keep the deliverable detail; methodology.m
 | S1 frozen evaluation | (all) | decide N@q relative to the scene's F_ref; SfM repeatability, 1 cell × 5 repeats (V2) | V1 decision written; F within 0.01 across repeats | G1 2026-11-12 |
 | S2 registration | RQ1 | a predictor of SfM registration replaces `coverage.min_overlap`, shared by every adaptive method; re-run `config/bench/oracle.yaml` | V3 overlap ρ ≥ 0.7; V4 green (oracle ≥ every GT-free method) | 2026-11-26 |
 | S3 C1 components | RQ3 | ReconState, DA-V2 anchoring with online anchors at 5–20 views, TSDF from anchored depth, timing | V5a–d | 2026-12-10 |
-| S4 claims on T0 | RQ2, RQ3 | `sfm_uncertainty`, `combo`; ablation + sensing matrices, 3 scenes × 3 seeds; novelty sweep #1 incl. registration-aware NBV | V6; **C1 go/no-go** | **G2 2026-12-17** |
-| S5 scale-up | RQ1–RQ3 | 8–10 scenes (≥ 3 GSO/Objaverse++) × 5 seeds, weights frozen on `office_buddha`; `tammes:128` pool | the paper matrix regenerates with one command | 2027-01-21 |
+| S4 claims on T0 | RQ2, RQ3 | `sfm_uncertainty`, `combo`; ablation + sensing matrices, `office_buddha` × 3 seeds (testbed; more scenes arrive in S5); novelty sweep #1 incl. registration-aware NBV | V6; **C1 go/no-go** | **G2 2026-12-17** |
+| S5 scale-up | RQ1–RQ3 | add scenes to the one-scene testbed up to 8–10 (re-create `office_monster` and `office_chair` from git history, see the note below) (≥ 3 GSO/Objaverse++) × 5 seeds, weights frozen on `office_buddha`; `tammes:128` pool | the paper matrix regenerates with one command | 2027-01-21 |
 | S6 transfer in sim | RQ4 | T1 transfer with dense eval on 2 scenes (V7); pose noise on T0 (V8); flight gate; T2, 4 methods × 5 seeds | V7, V8, flight gate (methodology §5); T2 τ reported | G3 2027-01-07 for V7/V8, T2 by 2027-02-11 |
 | S7 real flight | RQ4 | 3 real objects with scanned GT (scanner by G3), real runs of `orbit_rings`, `fvs`, Kinetix, `stereo_plan` | quantitative Chamfer / F / N@q on T3 | G4 2027-03-25 (needs bisg Phase 5) |
 | S8 paper + release | all | write, final novelty sweep, release package | publication-plan §8 checklist | G5 2027-04-22 |
